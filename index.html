@@ -2,7 +2,46 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <style>
+      html, body { touch-action:none; -webkit-text-size-adjust:100%; text-size-adjust:100%; overscroll-behavior:none; }
+      * { -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; }
+      input, textarea, select { font-size:16px !important; touch-action:manipulation; }
+    </style>
+    <script>
+      // スマホでのピンチ／ダブルタップ拡大を防止し、万一拡大されたら等倍に戻す
+      (function () {
+        const stop = e => e.preventDefault();
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, stop, { passive: false }));
+        document.addEventListener('dblclick', stop, { passive: false });
+        document.addEventListener('touchmove', e => { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+        let last = 0;
+        document.addEventListener('touchend', e => {
+          const now = Date.now();
+          const t = e.target;
+          const isField = t && t.closest && t.closest('input,textarea,select');
+          if (!isField && now - last < 350 && e.cancelable) e.preventDefault();
+          last = now;
+        }, { passive: false });
+        const resetZoom = () => {
+          const vv = window.visualViewport;
+          if (vv && vv.scale > 1.01) {
+            const ae = document.activeElement;
+            if (ae && ae.matches && ae.matches('input,textarea')) return;
+            const m = document.querySelector('meta[name=viewport]');
+            if (m) {
+              const c = m.getAttribute('content');
+              m.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0');
+              setTimeout(() => m.setAttribute('content', c), 300);
+            }
+            window.scrollTo(0, 0);
+          }
+        };
+        if (window.visualViewport) window.visualViewport.addEventListener('resize', () => setTimeout(resetZoom, 60));
+        document.addEventListener('focusout', () => setTimeout(resetZoom, 150));
+        setInterval(resetZoom, 1500);
+      })();
+    </script>
     <title>VOLT BREAKERS｜ヴォルト・ブレイカーズ - 無料で遊べる3D横スクロールアクションゲーム</title>
     <meta name="description" content="VOLT BREAKERS（ヴォルト・ブレイカーズ）は、ブラウザで今すぐ無料で遊べる3D横スクロールアクションゲーム。ダッシュ・壁蹴り・チャージショットを駆使して暴走した8体の守護機を倒し、特殊武器を手に入れろ。協力・対戦のオンラインマルチプレイ、PC・スマホ・ゲームパッド対応、パスワードで続きから遊べます。" />
     <meta name="keywords" content="VOLT BREAKERS,ヴォルト・ブレイカーズ,アクションゲーム,横スクロール,3Dアクション,ブラウザゲーム,無料ゲーム,オンライン協力,オンライン対戦,スマホゲーム,ボスバトル" />
