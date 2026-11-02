@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <title>VOLT BREAKERS｜ヴォルト・ブレイカーズ - 無料で遊べる3D横スクロールアクションゲーム</title>
+    <meta name="description" content="VOLT BREAKERS（ヴォルト・ブレイカーズ）は、ブラウザで今すぐ無料で遊べる3D横スクロールアクションゲーム。ダッシュ・壁蹴り・チャージショットを駆使して暴走した8体の守護機を倒し、特殊武器を手に入れろ。協力・対戦のオンラインマルチプレイ、PC・スマホ・ゲームパッド対応、パスワードで続きから遊べます。" />
+    <meta name="keywords" content="VOLT BREAKERS,ヴォルト・ブレイカーズ,アクションゲーム,横スクロール,3Dアクション,ブラウザゲーム,無料ゲーム,オンライン協力,オンライン対戦,スマホゲーム,ボスバトル" />
+    <meta name="author" content="VOLT BREAKERS Project" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="theme-color" content="#0a1430" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="application-name" content="VOLT BREAKERS" />
+    <meta name="apple-mobile-web-app-title" content="VOLT BREAKERS" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="icon" type="image/webp" href="assets/vb-favicon.webp" />
+    <link rel="apple-touch-icon" href="assets/vb-favicon.webp" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:site_name" content="VOLT BREAKERS｜ヴォルト・ブレイカーズ" />
+    <meta property="og:title" content="VOLT BREAKERS｜ヴォルト・ブレイカーズ - 3D横スクロールアクション" />
+    <meta property="og:description" content="機械都市ネオ・ヴォルタを救え。ダッシュ・壁蹴り・チャージショットで8体のボスに挑む、ブラウザで遊べる本格3Dアクション。オンライン協力・対戦対応。" />
+    <meta property="og:image" content="assets/vb-preview.webp" />
+    <meta property="og:image:width" content="1536" />
+    <meta property="og:image:height" content="864" />
+    <meta property="og:image:alt" content="VOLT BREAKERS キービジュアル：ネオン都市で戦うヴァンとレイ" />
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="VOLT BREAKERS｜ヴォルト・ブレイカーズ" />
+    <meta name="twitter:description" content="ブラウザで今すぐ遊べる3D横スクロールアクション。8体のボス、特殊武器、オンライン協力・対戦。" />
+    <meta name="twitter:image" content="assets/vb-preview.webp" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": "VOLT BREAKERS｜ヴォルト・ブレイカーズ",
+        "alternateName": ["VOLT BREAKERS", "ヴォルト・ブレイカーズ"],
+        "description": "暴走した自律機兵に支配された機械都市ネオ・ヴォルタを舞台に、特殊鎮圧部隊ブレイカーズの一員として8体の守護機と首謀者に挑む3D横スクロールアクションゲーム。",
+        "genre": ["Action", "Platformer", "横スクロールアクション"],
+        "inLanguage": "ja",
+        "image": "assets/vb-preview.webp",
+        "applicationCategory": "Game",
+        "operatingSystem": "Web Browser (PC / iOS / Android)",
+        "gamePlatform": ["Web Browser", "PC", "Smartphone"],
+        "playMode": ["SinglePlayer", "MultiPlayer", "CoOp"],
+        "numberOfPlayers": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 4 },
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" }
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Russo+One&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./rosebud-game-defaults.css" />
+    <script src="./rosebud-game-defaults.js" defer></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://esm.sh/three@0.184.0",
+          "three/": "https://esm.sh/three@0.184.0/",
+          "three/addons/": "https://esm.sh/three@0.184.0/examples/jsm/",
+          "@instantdb/core": "https://esm.sh/@instantdb/core@0.22.155"
+        }
+      }
+    </script>
+    <style>
+      :root { --ink:#e8f1ff; --steel:#1a2232; --steel2:#26324a; --edge:#5fc8ff; --hot:#ff4a5a; --gold:#ffd25a; }
+      html, body, #game-container { width:100%; height:100%; margin:0; padding:0; background:#050505; overflow:hidden; }
+      body { touch-action:none; font-family:'DotGothic16', system-ui, sans-serif; color:var(--ink); }
+      canvas { display:block; }
+      #ui { position:fixed; inset:0; pointer-events:none; z-index:5; }
+      .screen { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; pointer-events:auto; background:rgba(4,6,14,.86); padding:calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px); box-sizing:border-box; overflow-y:auto; }
+      .screen.bgimg { background-size:cover; background-position:center; }
+      .panel { background:linear-gradient(180deg,var(--steel2),var(--steel)); border:3px solid #0b0f18; outline:2px solid var(--edge); box-shadow:0 6px 0 #0b0f18, inset 0 0 0 2px rgba(255,255,255,.06); border-radius:6px 14px 6px 14px; padding:16px 20px; max-width:min(720px,94vw); box-sizing:border-box; }
+      h1.logo { font-family:'Russo One',sans-serif; font-size:clamp(30px,7vw,72px); margin:0; letter-spacing:2px; color:#fff; text-shadow:0 0 18px #3ab0ff, 4px 4px 0 #0b2a50; text-align:center; transform:rotate(-2deg); }
+      h2 { font-family:'Russo One',sans-serif; margin:0 0 6px; font-size:clamp(20px,4vw,30px); color:var(--gold); text-shadow:2px 2px 0 #000; text-align:center; }
+      .sub { opacity:.85; text-align:center; font-size:15px; }
+      .blink { animation:blink 1s steps(2) infinite; font-size:22px; text-shadow:2px 2px 0 #000; }
+      @keyframes blink { 50% { opacity:0; } }
+      .btn { font-family:'DotGothic16',sans-serif; font-size:18px; color:var(--ink); background:linear-gradient(180deg,#34445f,#1c2638); border:2px solid #0b0f18; outline:2px solid #4a6a90; border-radius:4px 10px 4px 10px; padding:10px 20px; min-width:220px; cursor:pointer; box-shadow:0 4px 0 #0b0f18; transform:rotate(-.5deg); }
+      .btn:nth-child(even) { transform:rotate(.5deg); }
+      .btn.sel, .btn:hover { outline-color:var(--gold); color:#fff; background:linear-gradient(180deg,#4a6290,#26344e); }
+      .btn:disabled { opacity:.4; cursor:default; }
+      .btn.small { min-width:0; font-size:15px; padding:6px 12px; }
+      .col { display:flex; flex-direction:column; gap:12px; align-items:center; }
+      .row { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; align-items:center; }
+      .cards { display:flex; gap:16px; flex-wrap:wrap; justify-content:center; }
+      .card { width:min(220px,40vw); cursor:pointer; text-align:center; padding:10px; }
+      .card img { width:100%; aspect-ratio:3/4; object-fit:cover; border:2px solid #0b0f18; border-radius:4px; background:#000; }
+      .card.sel { outline-color:var(--gold); }
+      .card.taken { opacity:.35; pointer-events:none; }
+      .grid3 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; width:min(560px,94vw); }
+      .cell { position:relative; aspect-ratio:1; cursor:pointer; padding:0; overflow:hidden; border-radius:6px; border:3px solid #0b0f18; outline:2px solid #4a6a90; background:#111; }
+      .cell img { width:100%; height:100%; object-fit:cover; display:block; }
+      .cell .lbl { position:absolute; left:0; right:0; bottom:0; font-size:clamp(9px,2.2vw,13px); background:rgba(0,0,0,.72); padding:3px; text-align:center; }
+      .cell.done img { filter:grayscale(1) brightness(.5); }
+      .cell.done::after { content:'CLEAR'; position:absolute; top:40%; left:0; right:0; text-align:center; font-family:'Russo One'; color:var(--gold); transform:rotate(-12deg); text-shadow:2px 2px 0 #000; }
+      .cell.sel { outline-color:var(--gold); }
+      .cell.locked { opacity:.45; }
+      .rgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(72px,1fr)); gap:6px; width:min(640px,92vw); }
+      .rcell { cursor:pointer; text-align:center; font-size:10px; padding:3px; border-radius:4px; border:2px solid #0b0f18; outline:2px solid #3a4a66; background:#121826; }
+      .rcell img { width:100%; aspect-ratio:1; object-fit:cover; display:block; }
+      .rcell.sel { outline-color:var(--gold); }
+      .rcell.taken { opacity:.3; pointer-events:none; }
+      input[type=text] { font-family:'Russo One'; font-size:26px; letter-spacing:6px; text-align:center; text-transform:uppercase; width:220px; padding:8px; background:#0b0f18; color:var(--gold); border:2px solid var(--edge); border-radius:4px; }
+      input[type=range] { width:200px; }
+      label { display:flex; gap:10px; align-items:center; justify-content:space-between; width:min(360px,80vw); }
+      .cut { justify-content:flex-end; background-size:cover; background-position:center; }
+      .cut .panel { width:min(720px,94vw); min-height:90px; font-size:18px; line-height:1.6; }
+      .skip { position:absolute; top:calc(env(safe-area-inset-top) + 12px); right:12px; }
+
+      /* HUD */
+      #hud { position:absolute; inset:0; display:none; }
+      #hud.on { display:block; }
+      .vbar { position:absolute; width:18px; height:min(160px,26vh); background:#0b0f18; border:2px solid #000; outline:2px solid #6a7a90; border-radius:3px; }
+      .vbar i { position:absolute; left:2px; right:2px; bottom:2px; background:repeating-linear-gradient(0deg,#ffe36a 0 4px,#c89a20 4px 6px); }
+      #hpbar { left:calc(env(safe-area-inset-left) + 14px); top:calc(env(safe-area-inset-top) + 14px); }
+      #wpbar { left:calc(env(safe-area-inset-left) + 40px); top:calc(env(safe-area-inset-top) + 14px); }
+      #bossbar { right:calc(env(safe-area-inset-right) + 14px); top:calc(env(safe-area-inset-top) + 62px); display:none; }
+      #bossbar i { background:repeating-linear-gradient(0deg,#ff5a6a 0 4px,#a01828 4px 6px); }
+      #hudinfo { position:absolute; left:calc(env(safe-area-inset-left) + 68px); top:calc(env(safe-area-inset-top) + 12px); font-size:13px; line-height:1.5; text-shadow:1px 1px 0 #000; background:rgba(10,14,24,.6); padding:4px 8px; border-radius:4px; }
+      #bossname { position:absolute; right:calc(env(safe-area-inset-right) + 40px); top:calc(env(safe-area-inset-top) + 64px); font-size:13px; text-shadow:1px 1px 0 #000; display:none; max-width:40vw; text-align:right; }
+      #pausebtn { position:absolute; right:calc(env(safe-area-inset-right) + 12px); top:calc(env(safe-area-inset-top) + 12px); pointer-events:auto; min-width:0; padding:6px 12px; font-size:16px; }
+      #score { position:absolute; left:50%; transform:translateX(-50%); top:calc(env(safe-area-inset-top) + 12px); font-family:'Russo One'; font-size:20px; text-shadow:2px 2px 0 #000; }
+      #banner { position:absolute; left:0; right:0; top:34%; text-align:center; font-family:'Russo One','DotGothic16'; font-size:clamp(26px,6vw,56px); color:#fff; text-shadow:0 0 14px var(--edge), 3px 3px 0 #000; opacity:0; transition:opacity .25s; padding:0 10px; }
+      #banner.warning { color:#ff3a3a; text-shadow:0 0 18px #ff0000, 3px 3px 0 #000; background:repeating-linear-gradient(45deg,rgba(255,40,40,.25) 0 20px,transparent 20px 40px); padding:12px 0; }
+      #banner.boss { color:var(--gold); font-family:'DotGothic16'; }
+      #toast { position:absolute; left:50%; transform:translateX(-50%); top:calc(env(safe-area-inset-top) + 76px); max-width:min(560px,80vw); text-align:center; font-size:16px; background:rgba(10,14,24,.85); border:2px solid var(--edge); padding:6px 14px; border-radius:4px 10px 4px 10px; opacity:0; transition:opacity .3s; }
+
+      /* touch */
+      #touch { position:absolute; inset:0; display:none; }
+      #touch.on { display:block; }
+      .tb { position:absolute; pointer-events:auto; width:64px; height:64px; border-radius:50%; background:rgba(30,44,70,.55); border:2px solid rgba(140,200,255,.7); color:#fff; font-size:13px; display:flex; align-items:center; justify-content:center; font-family:'DotGothic16'; touch-action:none; }
+      .tb.pressed { background:rgba(95,200,255,.6); }
+      #t-left { left:calc(env(safe-area-inset-left) + 16px); bottom:calc(env(safe-area-inset-bottom) + 28px); }
+      #t-right { left:calc(env(safe-area-inset-left) + 92px); bottom:calc(env(safe-area-inset-bottom) + 28px); }
+      #t-jump { right:calc(env(safe-area-inset-right) + 16px); bottom:calc(env(safe-area-inset-bottom) + 28px); width:72px; height:72px; }
+      #t-shot { right:calc(env(safe-area-inset-right) + 100px); bottom:calc(env(safe-area-inset-bottom) + 20px); width:72px; height:72px; }
+      #t-dash { right:calc(env(safe-area-inset-right) + 40px); bottom:calc(env(safe-area-inset-bottom) + 112px); }
+      #t-wpn { right:calc(env(safe-area-inset-right) + 120px); bottom:calc(env(safe-area-inset-bottom) + 104px); width:52px; height:52px; font-size:11px; }
+      #t-sp { right:calc(env(safe-area-inset-right) + 182px); bottom:calc(env(safe-area-inset-bottom) + 70px); width:56px; height:56px; font-size:13px; border-color:rgba(255,200,90,.85); }
+      #t-tank { left:calc(env(safe-area-inset-left) + 54px); bottom:calc(env(safe-area-inset-bottom) + 104px); width:48px; height:48px; font-size:11px; }
+    </style>
+  
+<style>
+    #rosebud-exported-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #000;
+        opacity: 1;
+        transition: opacity 500ms ease-in-out;
+    }
+
+    #rosebud-exported-splash.is-hiding {
+        opacity: 0;
+    }
+
+    #rosebud-exported-splash .rosebud-exported-splash__content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        text-align: center;
+        color: #fff;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    #rosebud-exported-splash .rosebud-exported-splash__logo {
+        width: 100px;
+        height: 100px;
+        animation: rosebud-exported-splash-breathe 2.4s ease-in-out infinite;
+    }
+
+    #rosebud-exported-splash .rosebud-exported-splash__text {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 16px;
+        line-height: 1.25;
+        letter-spacing: 0.06em;
+    }
+
+    #rosebud-exported-splash .rosebud-exported-splash__text strong {
+        font-weight: 700;
+    }
+
+    #rosebud-exported-splash .rosebud-exported-splash__text span:last-child {
+        opacity: 0.88;
+    }
+
+    @keyframes rosebud-exported-splash-breathe {
+        0%,
+        100% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.05);
+        }
+    }
+</style></head>
+  <body>
+<div id="rosebud-exported-splash" aria-live="polite">
+    <div class="rosebud-exported-splash__content">
+        <img
+            class="rosebud-exported-splash__logo"
+            src="__rosebud/rosebud-icon.png"
+            alt="Rosebud Logo"
+            width="100"
+            height="100"
+        />
+        <div class="rosebud-exported-splash__text" aria-label="Rosebud.AI Make Games">
+            <strong>Rosebud.AI</strong>
+            <span>Make Games</span>
+        </div>
+    </div>
+</div>
+    <main id="seo" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">
+      <h1>VOLT BREAKERS｜ヴォルト・ブレイカーズ</h1>
+      <p>ブラウザで今すぐ無料で遊べる3D横スクロールアクションゲーム。</p>
+      <section>
+        <h2>ストーリー</h2>
+        <p>機械都市ネオ・ヴォルタ。都市防衛を担う8体の守護機が暴走し、首謀者オーバーロード・ザインのもとに集結した。特殊鎮圧部隊「ブレイカーズ」の射撃型ヴァン、近接型レイとなって都市を取り戻せ。</p>
+      </section>
+      <section>
+        <h2>ゲームの特徴</h2>
+        <ul>
+          <li>ダッシュ・壁蹴り・3段階チャージショット・3連グレイブの爽快アクション</li>
+          <li>8体のボスを好きな順番で攻略し、特殊武器と弱点の連鎖を見つけ出す</li>
+          <li>隠しボス、最終要塞4ステージ、2段階変身するラスボス</li>
+          <li>パスワードで続きから遊べる</li>
+          <li>オンライン協力プレイ（2人）・対戦（2人／4人）</li>
+          <li>PC（キーボード・ゲームパッド）とスマートフォンのタッチ操作に対応</li>
+        </ul>
+      </section>
+      <section>
+        <h2>操作方法</h2>
+        <p>移動：←→/AD、ジャンプ：Space/K、ダッシュ：Shift/L、ショット：J/Z、特殊武器：X/I、武器切替：Q/E、回復セル：T、ポーズ：Esc/P。</p>
+      </section>
+    </main>
+    <noscript><p style="color:#fff;padding:20px">VOLT BREAKERS｜ヴォルト・ブレイカーズ を遊ぶにはJavaScriptを有効にしてください。</p></noscript>
+    <div id="game-container"></div>
+    <div id="ui">
+      <div id="hud">
+        <div class="vbar" id="hpbar"><i></i></div>
+        <div class="vbar" id="wpbar"><i></i></div>
+        <div id="hudinfo"></div>
+        <div class="vbar" id="bossbar"><i></i></div>
+        <div id="bossname"></div>
+        <div id="score"></div>
+        <button class="btn" id="pausebtn">II</button>
+        <div id="banner"></div>
+        <div id="toast"></div>
+        <div id="touch">
+          <div class="tb" id="t-left">◀</div>
+          <div class="tb" id="t-right">▶</div>
+          <div class="tb" id="t-tank">CELL</div>
+          <div class="tb" id="t-jump">JUMP</div>
+          <div class="tb" id="t-shot">SHOT</div>
+          <div class="tb" id="t-dash">DASH</div>
+          <div class="tb" id="t-wpn">WPN</div>
+          <div class="tb" id="t-sp">SP</div>
+        </div>
+      </div>
+      <div id="screens"></div>
+    </div>
+    <script type="module" src="main.js"></script>
+    <script src="https://storage.googleapis.com/rosebud_staticfiles/ChatManager.js"></script>
+    <script src="https://storage.googleapis.com/rosebud_staticfiles/ProgressLogger.js"></script>
+    <script src="https://storage.googleapis.com/rosebud_staticfiles/OGP.js"></script>
+  
+<script>
+    (() => {
+        const splashRoot = document.getElementById('rosebud-exported-splash');
+        if (!splashRoot) return;
+
+        let isReady = false;
+        let isMinimumVisibleTimeElapsed = false;
+        let isHidden = false;
+
+        const maybeHideSplash = () => {
+            if (isHidden || !isReady || !isMinimumVisibleTimeElapsed) return;
+
+            isHidden = true;
+            splashRoot.classList.add('is-hiding');
+            window.setTimeout(() => splashRoot.remove(), 500);
+        };
+
+        const markReady = () => {
+            isReady = true;
+            maybeHideSplash();
+        };
+
+        window.setTimeout(() => {
+            isMinimumVisibleTimeElapsed = true;
+            maybeHideSplash();
+        }, 1000);
+
+        if (document.readyState === 'complete') {
+            markReady();
+        } else {
+            window.addEventListener('load', markReady, { once: true });
+        }
+
+        
+    })();
+</script></body>
+</html>
