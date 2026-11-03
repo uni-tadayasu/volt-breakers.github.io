@@ -1392,8 +1392,19 @@ export class Game {
     if (opts.ov) {
       Object.assign(sh, opts.ov);
     }
-    if (team === 'foe' && owner === 'boss') {
-      sh.dmg = Math.ceil(sh.dmg * 1.3) + 1;
+    const src = team === 'foe' ? this.shotSrc : null; // 発射中の雑魚／ボス
+    if (sh.fixed) {
+      // 固定ダメージ（爆風など）
+    } else if (team === 'foe' && owner === 'boss') {
+      if (src && src.kind === 'enemy') {
+        sh.fromEnemy = true;
+        // 雑魚弾：控えめな固定ダメージ（ステージ進行で少し上昇）
+        sh.dmg = Math.min(sh.dmg, 2) * this.enemyDmgScale();
+        if (type === 'laser') sh.dmg = 3 * this.enemyDmgScale();
+        sh.dmg = Math.max(1, Math.round(sh.dmg));
+      } else {
+        sh.dmg = Math.min(6, Math.ceil(sh.dmg * 1.2) + 1);
+      }
     }
     const od = team === 'ally' && owner === myId && (this.parts & 4) && this.mode !== 'versus';
     if (od) {
@@ -1402,7 +1413,10 @@ export class Game {
     }
     sh.color = color;
     let mesh;
-    if (vis === 'crescent') {
+    const shape = opts.shape || (src && type === 'orb' && (!opts.ov || ['bomb', 'arc', 'delay'].includes(opts.ov.beh)) ? src.shape : null);
+    if (shape) {
+      mesh = this.shapeMesh(shape, color, sh);
+    } else if (vis === 'crescent') {
       mesh = new THREE.Mesh(g.crescent, basicMat(color));
       mesh.scale.setScalar(sh.r * 1.2);
       mesh.scale.x *= dir;
@@ -1426,7 +1440,7 @@ export class Game {
       mesh.scale.setScalar(sh.r * 0.7);
     }
     const gl = new THREE.Sprite(spriteMat(color));
-    gl.scale.setScalar(vis === 'orb' ? 6 : 3);
+    gl.scale.setScalar(shape ? 2.6 / Math.max(0.05, mesh.scale.x) * sh.r : vis === 'orb' ? 6 : 3);
     mesh.add(gl);
     if (od) {
       // オーバードライブ：金色の二重オーラ＋スパーク
@@ -1445,6 +1459,123 @@ export class Game {
     return sh;
   }
 
+  // 敵ごとの弾の形状
+  shapeMesh(shape, color, sh) {
+    const g = geo();
+    const r = sh.r;
+    let m;
+    const core = (geom, s) => {
+      const c = new THREE.Mesh(geom, basicMat(0xffffff));
+      c.scale.setScalar(s);
+      return c;
+    };
+    switch (shape) {
+      case 'cube':
+        m = new THREE.Mesh(g.box, basicMat(color));
+        m.scale.setScalar(r * 1.5);
+        m.add(core(g.box, 0.55));
+        sh.spinV = [3, 5, 0];
+        break;
+      case 'diamond':
+        m = new THREE.Mesh(g.oct, basicMat(color));
+        m.scale.set(r * 0.9, r * 1.5, r * 0.9);
+        m.add(core(g.oct, 0.5));
+        sh.spinV = [0, 6, 0];
+        break;
+      case 'ring':
+        m = new THREE.Mesh(g.torus, basicMat(color));
+        m.scale.setScalar(r * 1.3);
+        m.add(core(g.sphere, 0.3));
+        sh.spinV = [0, 0, 8];
+        break;
+      case 'spike':
+        m = new THREE.Mesh(g.cone, basicMat(color));
+        m.scale.set(r * 1.1, r * 3, r * 1.1);
+        m.add(core(g.cone, 0.5));
+        sh.faceVel = true;
+        break;
+      case 'needle':
+        m = new THREE.Mesh(g.cone, basicMat(color));
+        m.scale.set(r * 0.5, r * 4.5, r * 0.5);
+        sh.faceVel = true;
+        break;
+      case 'bomb': {
+        m = new THREE.Mesh(g.sphere, basicMat(0x222222));
+        m.scale.setScalar(r * 1.2);
+        const fuse = new THREE.Mesh(g.sphere, basicMat(color));
+        fuse.scale.setScalar(0.35);
+        fuse.position.y = 1;
+        m.add(fuse);
+        sh.spinV = [0, 0, 3];
+        break;
+      }
+      case 'shell':
+        m = new THREE.Mesh(g.sphere, basicMat(color));
+        m.scale.set(r * 1.8, r * 1.0, r * 1.0);
+        m.add(core(g.sphere, 0.5));
+        sh.faceVel = true;
+        break;
+      case 'star':
+        m = new THREE.Mesh(g.ico, basicMat(color));
+        m.scale.setScalar(r * 1.4);
+        m.add(core(g.ico, 0.5));
+        sh.spinV = [4, 4, 4];
+        break;
+      case 'shuriken': {
+        m = new THREE.Group();
+        for (let k = 0; k < 4; k++) {
+          const b = new THREE.Mesh(g.cone, basicMat(color));
+          b.scale.set(0.35, 1.2, 0.2);
+          b.rotation.z = (k / 4) * Math.PI * 2;
+          b.position.set(Math.sin(-b.rotation.z) * 0.5, Math.cos(b.rotation.z) * 0.5, 0);
+          m.add(b);
+        }
+        m.add(core(g.sphere, 0.3));
+        m.scale.setScalar(r * 1.6);
+        sh.spinV = [0, 0, 14];
+        break;
+      }
+      case 'flame':
+        m = new THREE.Mesh(g.cone, basicMat(color));
+        m.scale.set(r * 1.6, r * 2.4, r * 1.6);
+        m.add(core(g.sphere, 0.3));
+        sh.faceVel = true;
+        sh.flicker = true;
+        break;
+      case 'crystal':
+        m = new THREE.Mesh(g.oct, basicMat(color));
+        m.scale.set(r * 0.7, r * 2.2, r * 0.7);
+        m.add(core(g.oct, 0.45));
+        sh.faceVel = true;
+        break;
+      case 'bolt':
+        m = new THREE.Mesh(g.box, basicMat(color));
+        m.scale.set(r * 3, r * 0.5, r * 0.5);
+        m.add(core(g.box, 0.5));
+        sh.faceVel = true;
+        sh.flicker = true;
+        break;
+      case 'rock':
+        m = new THREE.Mesh(g.ico, basicMat(color));
+        m.scale.set(r * 1.5, r * 1.2, r * 1.3);
+        sh.spinV = [2, 3, 5];
+        break;
+      case 'drop':
+        m = new THREE.Mesh(g.sphere, basicMat(color));
+        m.scale.set(r * 1.2, r * 1.6, r * 1.2);
+        m.add(core(g.sphere, 0.4));
+        sh.faceVel = true;
+        break;
+      default:
+        m = new THREE.Mesh(g.sphere, basicMat(color));
+        m.scale.setScalar(r * 0.8);
+    }
+    if (['spike', 'needle', 'crystal', 'drop'].includes(shape)) sh.faceOff = -Math.PI / 2;
+    if (shape === 'flame') sh.faceOff = Math.PI / 2; // 炎の尾を後方に
+    m.userData.baseScale = m.scale.clone();
+    return m;
+  }
+
   removeShot(i, spark = true) {
     const sh = this.shots[i];
     if (spark) {
@@ -1454,13 +1585,13 @@ export class Game {
     this.shots.splice(i, 1);
     if ((sh.beh === 'bomb' || sh.beh === 'arc') && !sh.blasted) {
       sh.blasted = true;
-      this.blast(sh.x, sh.y, sh.team, sh.color, 1.2);
+      this.blast(sh.x, sh.y, sh.team, sh.color, 1.2, sh.fromEnemy ? 2 : 4);
     }
   }
 
   // 爆風（敵弾の爆弾・迫撃砲・地雷用）
-  blast(x, y, team, color, r) {
-    const b = this.spawnShot(team, 'orb', x, y, 1, 0, 'boss', { speed: 0, color, ov: { r, life: 0.18, pierce: true, walls: false, dmg: 2 } });
+  blast(x, y, team, color, r, dmg = 2) {
+    const b = this.spawnShot(team, 'orb', x, y, 1, 0, 'boss', { speed: 0, color, ov: { r, life: 0.18, pierce: true, walls: false, dmg, fixed: true } });
     b.mesh.visible = false;
     this.particles.emit(x, y, color, 14, { ring: true, speed: 6, life: 0.35, size: 0.7 });
     this.particles.emit(x, y, 0xffee99, 10, { speed: 4, life: 0.45, size: 0.8 });
@@ -1473,10 +1604,44 @@ export class Game {
   }
 
   mineBurst(e) {
+    const prev = this.shotSrc;
+    this.shotSrc = this.enemySrc(e);
     for (let k = 0; k < 8; k++) {
       this.spawnShot('foe', 'orb', e.x, e.y + 0.4, 1, 0, 'boss', { angle: (k / 8) * Math.PI * 2, speed: 6, color: 0xff3322 });
     }
-    this.blast(e.x, e.y + 0.3, 'foe', 0xff4422, 1.4);
+    this.shotSrc = prev;
+    this.blast(e.x, e.y + 0.3, 'foe', 0xff4422, 1.4, 2);
+  }
+
+  // 敵ごとの弾の形（攻撃エフェクト図形）
+  enemySrc(e) {
+    const SH = {
+      walker: 'cube', shielder: 'diamond', drone: 'ring', turret: 'spike', hopper: 'cube',
+      bomber: 'bomb', sniper: 'needle', roller: 'rock', mine: 'spike', bat: 'drop',
+      mortar: 'shell', heavy: 'flame', splitter: 'crystal', mini: 'diamond', orbiter: 'star',
+    };
+    return { kind: 'enemy', shape: SH[e.type] || 'cube' };
+  }
+
+  bossSrc(b) {
+    const SH = {
+      volca: 'flame', frost: 'crystal', storm: 'shuriken', spark: 'bolt', quake: 'rock', boomer: 'shuriken',
+      laser: 'diamond', scorpio: 'drop', vile: 'needle', shadow: 'star', void: 'bolt', crimsonx: 'flame',
+      trinity: 'star', guardian: 'cube', overlord: b.phase === 2 ? 'star' : 'spike',
+    };
+    return { kind: 'boss', shape: SH[b.def.id] || 'diamond' };
+  }
+
+  // ステージ進行度による雑魚の強さ補正
+  stageTier() {
+    const id = this.stage ? this.stage.id : '';
+    if (id === 'intro') return 0;
+    if (/^f\d/.test(id)) return 2;
+    return this.stage && this.stage.arena ? 1 : 1;
+  }
+
+  enemyDmgScale() {
+    return [0.75, 1, 1.25][this.stageTier()];
   }
 
   shake(amt) {
@@ -1757,6 +1922,16 @@ export class Game {
       sh.x += sh.vx * dt;
       sh.y += sh.vy * dt;
       sh.mesh.position.set(sh.x, sh.y, 0.3);
+      if (sh.spinV) {
+        sh.mesh.rotation.x += sh.spinV[0] * dt;
+        sh.mesh.rotation.y += sh.spinV[1] * dt;
+        sh.mesh.rotation.z += sh.spinV[2] * dt * (sh.vx < 0 ? 1 : -1);
+      } else if (sh.faceVel && (sh.vx || sh.vy)) {
+        sh.mesh.rotation.z = Math.atan2(sh.vy, sh.vx) + (sh.faceOff || 0);
+      }
+      if (sh.flicker && sh.mesh.userData.baseScale) {
+        sh.mesh.scale.copy(sh.mesh.userData.baseScale).multiplyScalar(0.8 + Math.random() * 0.4);
+      }
       if (sh.walls && this.pointSolid(sh.x, sh.y + (sh.beh === 'quake' ? 0.5 : 0))) {
         this.removeShot(i);
         continue;
@@ -1871,7 +2046,7 @@ export class Game {
       rig = makePrimEnemy(type);
     }
     this.world.add(rig.group);
-    const e = { type, rig, x, y, baseY: y, w: def.w, h: def.h, vx: 0, vy: 0, hp: def.hp, dir: -1, t: Math.random() * 2, shootT: 1.5 + Math.random(), fly: !!def.fly, flash: 0, onGround: false, st: 0, aimT: 0 };
+    const e = { type, rig, x, y, baseY: y, w: def.w, h: def.h, vx: 0, vy: 0, hp: Math.max(1, Math.round(def.hp * [0.8, 1, 1.35][this.stageTier()])), dir: -1, t: Math.random() * 2, shootT: 1.5 + Math.random(), fly: !!def.fly, flash: 0, onGround: false, st: 0, aimT: 0 };
     this.enemies.push(e);
     return e;
   }
@@ -1932,10 +2107,11 @@ export class Game {
         continue;
       }
       e.t += dt;
-      e.shootT -= dt;
+      e.shootT -= dt * [0.7, 1, 1.12][this.stageTier()];
       e.flash -= dt;
       const toP = p.x < e.x ? -1 : 1;
       const aim = Math.atan2(p.y + 0.9 - (e.y + e.h * 0.6), p.x - e.x);
+      this.shotSrc = e.src || (e.src = this.enemySrc(e));
       switch (e.type) {
         case 'walker':
         case 'shielder':
@@ -2177,7 +2353,7 @@ export class Game {
         }
       }
       if (!p.dead && this.overlap(p, { x0: e.x - e.w / 2, x1: e.x + e.w / 2, y0: e.y, y1: e.y + e.h })) {
-        this.hurtPlayer(3, 'boss');
+        this.hurtPlayer((e.type === 'heavy' || e.type === 'roller' ? 1 : 0) + [2, 2, 3][this.stageTier()], 'boss');
       }
     }
   }
@@ -2998,11 +3174,14 @@ export class Game {
     }
     this.updatePlayer(p, dt);
     this.updateEnemies(dt);
+    this.shotSrc = null;
     for (let i = this.bosses.length - 1; i >= 0; i--) {
       if (this.bosses[i]) {
+        this.shotSrc = this.bossSrc(this.bosses[i]);
         this.updateBoss(this.bosses[i], dt);
       }
     }
+    this.shotSrc = null;
     this.updateShots(dt);
     this.updateItems(dt);
     // stage events
