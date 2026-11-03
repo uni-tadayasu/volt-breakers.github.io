@@ -6,10 +6,14 @@ import { input } from './input.js';
 import { play, playMusic, setTrack } from './audio.js';
 import { makeModel, playAnim, getTexture, ensureModel, hasModel } from './assets.js';
 
-const DEFERRED_MODELS = ['overlord', 'vb-operator-brute', 'vb-staff-hornet2', 'vb-staff-sage'];
+const DEFERRED_MODELS = ['vb-operator-brute', 'vb-staff-hornet2', 'vb-staff-sage'];
 // ネットワークから受け付ける弾種／モデル名のホワイトリスト
 export const SHOT_TYPES = new Set(['buster', 'slash', 'wave', 'fire', 'ice', 'homing', 'spark', 'quake', 'boomerang', 'laser', 'spread', 'spikebomb', 'cutter', 'mine', 'ray']);
-const NET_MODELS = new Set(['vb-hero-van', 'vb-hero-rei', 'enemy-walker', 'boss-mech', ...DEFERRED_MODELS]);
+const BOSS_MODELS = [
+  ...['volca', 'frost', 'storm', 'spark', 'quake', 'boomer', 'laser', 'scorpio'].map(id => 'vb-boss-' + id),
+  'vb-op-boss', 'vb-hid-shadow', 'vb-hid-void', 'vb-hid-crimson', 'vb-fused', 'vb-guardian', 'vb-overlord', 'vb-overlord2',
+];
+const NET_MODELS = new Set(['vb-hero-van', 'vb-hero-rei', 'enemy-walker', 'boss-mech', ...DEFERRED_MODELS, ...BOSS_MODELS]);
 const num = (v, lo, hi, d) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
 import { myId } from './net.js';
 
@@ -434,9 +438,22 @@ export class Game {
   // ---------------- lifecycle ----------------
   start(cfg) {
     // 後読みモデル（ラスボス・宇邇宮）を使うキャラで未読込なら、読み込み完了を待ってから開始
-    if (cfg.kit && DEFERRED_MODELS.includes(cfg.kit.model) && !hasModel(cfg.kit.model) && !cfg._waited) {
-      ensureModel(cfg.kit.model).then(() => this.start({ ...cfg, _waited: true }));
-      return;
+    if (!cfg._waited) {
+      const need = new Set();
+      const lazy = m => m && (DEFERRED_MODELS.includes(m) || BOSS_MODELS.includes(m)) && !hasModel(m);
+      if (cfg.kit && lazy(cfg.kit.model)) need.add(cfg.kit.model);
+      (cfg.stage?.bosses || []).forEach(b => { if (lazy(b?.model)) need.add(b.model); });
+      if (cfg.stage?.boss && lazy(cfg.stage.boss.model)) need.add(cfg.stage.boss.model);
+      (cfg.stage?.bosses || []).forEach(b => { if (lazy(b?.phase2Model)) need.add(b.phase2Model); });
+      if (cfg.kit && lazy(cfg.kit.phase2Model)) need.add(cfg.kit.phase2Model);
+      // 隠しボスは途中出現なので待たずに裏読み
+      if (cfg.stage?.hidden?.model && lazy(cfg.stage.hidden.model)) ensureModel(cfg.stage.hidden.model);
+      if (need.size) {
+        const timeout = new Promise(r => setTimeout(r, 15000));
+        Promise.race([Promise.all([...need].map(m => ensureModel(m).catch(() => {}))), timeout])
+          .then(() => this.start({ ...cfg, _waited: true }));
+        return;
+      }
     }
     DEFERRED_MODELS.forEach(m => ensureModel(m));
     this.cleanup();
@@ -799,8 +816,8 @@ export class Game {
     // solids
     const floorT = getTexture('vb-tile-floor');
     const wallT = getTexture('vb-tile-wall');
-    const floorM = new THREE.MeshStandardMaterial({ map: floorT, color: 0xdde2ee, metalness: 0.45, roughness: 0.45, emissive: 0xffffff, emissiveMap: floorT, emissiveIntensity: 0.12 });
-    const wallM = new THREE.MeshStandardMaterial({ map: wallT, color: 0xb8c0d4, metalness: 0.4, roughness: 0.55, emissive: 0xffffff, emissiveMap: wallT, emissiveIntensity: 0.18 });
+    const floorM = new THREE.MeshStandardMaterial({ map: floorT, color: st.tile?.floor ?? 0xdde2ee, metalness: 0.45, roughness: 0.45, emissive: st.tile?.floor ?? 0xffffff, emissiveMap: floorT, emissiveIntensity: 0.12 });
+    const wallM = new THREE.MeshStandardMaterial({ map: wallT, color: st.tile?.wall ?? 0xb8c0d4, metalness: 0.4, roughness: 0.55, emissive: st.tile?.wall ?? 0xffffff, emissiveMap: wallT, emissiveIntensity: 0.18 });
     const edgeM = new THREE.MeshBasicMaterial({ color: st.accent, toneMapped: false });
     this.disposables.push(floorM, wallM, edgeM);
     const mats = [wallM, wallM, floorM, wallM, wallM, wallM];
@@ -1623,19 +1640,18 @@ export class Game {
         mesh.add(s);
       }
     } else {
-      mesh = new THREE.Mesh(g.sphere, basicMat(0xffffff));
-      mesh.scale.setScalar(sh.r * 0.7);
+      mesh = this.shapedOrb(type, color, sh);
     }
     const gl = new THREE.Sprite(spriteMat(color));
-    gl.scale.setScalar(shape ? 2.6 / Math.max(0.05, mesh.scale.x) * sh.r : vis === 'orb' ? 6 : 3);
+    gl.scale.setScalar(shape ? 2.6 / Math.max(0.05, mesh.scale.x) * sh.r : vis === 'orb' ? sh.r * 4.2 : 3);
     mesh.add(gl);
     if (od) {
       // オーバードライブ：金色の二重オーラ＋スパーク
       mesh.scale.multiplyScalar(1.3);
       const aura = new THREE.Sprite(spriteMat(0xffcc33));
-      aura.scale.setScalar(vis === 'orb' ? 9 : 5);
+      aura.scale.setScalar(vis === 'orb' ? sh.r * 6.3 : 5);
       const aura2 = new THREE.Sprite(spriteMat(0xff66ee));
-      aura2.scale.setScalar(vis === 'orb' ? 4 : 2.4);
+      aura2.scale.setScalar(vis === 'orb' ? sh.r * 2.8 : 2.4);
       mesh.add(aura, aura2);
       sh.od = true;
     }
@@ -1644,6 +1660,86 @@ export class Game {
     this.world.add(mesh);
     this.shots.push(sh);
     return sh;
+  }
+
+  // 球だった弾を、種類ごとに形のあるエフェクトへ（ジオメトリ・マテリアルは共有キャッシュ）
+  shapedOrb(type, color, sh) {
+    const g = geo();
+    const r = sh.r;
+    const root = new THREE.Group();
+    const core = new THREE.Mesh(g.sphere, basicMat(0xffffff));
+    if (type === 'buster') {
+      // 弾丸型コア＋回転リング（チャージ段階でリング増）
+      core.scale.set(r * 1.25, r * 0.6, r * 0.6);
+      root.add(core);
+      const spin = new THREE.Group();
+      const rings = r > 0.5 ? 3 : r > 0.3 ? 2 : 1;
+      for (let i = 0; i < rings; i++) {
+        const t = new THREE.Mesh(g.torus, basicMat(color));
+        t.rotation.y = Math.PI / 2;
+        t.position.x = -i * r * 0.7;
+        t.scale.setScalar(r * (1.1 - i * 0.2));
+        spin.add(t);
+      }
+      root.add(spin);
+      sh.spinPart = spin;
+      sh.faceVel = true;
+    } else if (type === 'fire') {
+      // 炎：後ろへ伸びる円錐の束
+      core.scale.setScalar(r * 0.55);
+      root.add(core);
+      for (let i = 0; i < 3; i++) {
+        const c = new THREE.Mesh(g.cone, basicMat(i ? 0xff5522 : color));
+        c.rotation.z = Math.PI / 2;
+        c.scale.set(r * (1.2 - i * 0.25), r * (2.4 - i * 0.4), r * (1.2 - i * 0.25));
+        c.position.set(-r * (0.9 + i * 0.2), (i - 1) * r * 0.35, 0);
+        root.add(c);
+      }
+      sh.faceVel = true;
+    } else if (type === 'homing') {
+      // ミサイル：胴体＋弾頭＋尾翼
+      const body = new THREE.Mesh(g.cyl, basicMat(0xe8eef8));
+      body.scale.setScalar(r * 2.2);
+      const nose = new THREE.Mesh(g.cone, basicMat(color));
+      nose.rotation.z = -Math.PI / 2;
+      nose.scale.set(r * 0.85, r * 1.1, r * 0.85);
+      nose.position.x = r * 1.5;
+      root.add(body, nose);
+      for (const s of [-1, 1]) {
+        const fin = new THREE.Mesh(g.box, basicMat(color));
+        fin.scale.set(r * 0.6, r * 0.9, r * 0.08);
+        fin.position.set(-r * 0.9, s * r * 0.45, 0);
+        root.add(fin);
+      }
+      sh.faceVel = true;
+    } else if (type === 'spark') {
+      // 電撃球：とがった多面体＋直交リング
+      const star = new THREE.Mesh(g.oct, basicMat(color));
+      star.scale.setScalar(r * 1.3);
+      core.scale.setScalar(r * 0.6);
+      const ring = new THREE.Mesh(g.torus, basicMat(0xffffff));
+      ring.scale.setScalar(r * 1.2);
+      root.add(star, core, ring);
+      sh.spinV = [6, 9, 4];
+    } else if (type === 'spreadp') {
+      const d = new THREE.Mesh(g.oct, basicMat(color));
+      d.scale.set(r * 1.6, r * 0.7, r * 0.7);
+      core.scale.setScalar(r * 0.45);
+      root.add(d, core);
+      sh.faceVel = true;
+    } else {
+      // 敵の汎用弾：多面体コア＋回転リング
+      const ico = new THREE.Mesh(g.ico, basicMat(color));
+      ico.scale.setScalar(r * 0.9);
+      core.scale.setScalar(r * 0.5);
+      const ring = new THREE.Mesh(g.torus, basicMat(0xffffff));
+      ring.scale.setScalar(r * 1.1);
+      root.add(ico, core, ring);
+      sh.spinV = sh.spinV || [3, 5, 2];
+    }
+    // 子のスケールを持つため、グロー計算用に外側は等倍
+    root.scale.setScalar(1);
+    return root;
   }
 
   // 敵ごとの弾の形状
@@ -1875,7 +1971,7 @@ export class Game {
           const a = Math.random() * Math.PI * 2;
           P.emit(sh.x + Math.cos(a) * sh.r, sh.y + Math.sin(a) * sh.r, Math.random() < 0.5 ? 0xffee55 : 0xffffff, 1, { speed: 4, life: 0.12, size: 0.25 });
         }
-        sh.mesh.scale.setScalar(sh.r * 0.7 * (0.8 + Math.random() * 0.5));
+        sh.mesh.scale.setScalar(0.85 + Math.random() * 0.35);
         break;
       case 'laser':
         if (R < 0.8) P.emit(sh.x - sh.vx * 0.03, sh.y, Math.random() < 0.5 ? sh.color : 0xffffff, 1, { speed: 0.3, life: 0.2, size: 0.35 });
@@ -2162,6 +2258,8 @@ export class Game {
       sh.x += sh.vx * dt;
       sh.y += sh.vy * dt;
       sh.mesh.position.set(sh.x, sh.y, 0.3);
+      if (sh.spinPart) sh.spinPart.rotation.x += dt * 14;
+      if (sh.faceVel) sh.mesh.rotation.z = Math.atan2(sh.vy, sh.vx);
       if (sh.spinV) {
         sh.mesh.rotation.x += sh.spinV[0] * dt;
         sh.mesh.rotation.y += sh.spinV[1] * dt;
@@ -2754,6 +2852,16 @@ export class Game {
       b.grounded = true;
       b.t = 0;
       b.weapons = d.phase2Weapons;
+      if (d.phase2Model && hasModel(d.phase2Model)) {
+        // 第二形態はモデルごと差し替え
+        const nr = makeModel(d.phase2Model, { height: d.height });
+        b.rig.group.remove(b.rig.inner);
+        b.rig.group.add(nr.inner);
+        b.rig.inner = nr.inner;
+        b.rig.mixer = nr.mixer;
+        b.rig.actions = nr.actions;
+        b.rig.current = null;
+      }
       b.rig.group.scale.setScalar(1.45);
       b.w *= 1.45;
       b.h *= 1.45;
@@ -3123,7 +3231,7 @@ export class Game {
           if (!s.fired && b.t > s.t) {
             s.fired = true;
             const sh = this.spawnShot('foe', 'orb', s.x, topY, 1, 0, 'boss', { angle: -Math.PI / 2, speed: 2, color: 0xb07a44, ov: { beh: 'bomb', r: 0.45 } });
-            sh.mesh.scale.setScalar(0.5);
+            sh.mesh.scale.setScalar(1.15);
           }
         }
         if (b.act === 3 && b.t > b.t3 + 0.5 + n * 0.15 + 0.6 || b.t > 5) done();

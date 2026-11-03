@@ -5,7 +5,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 // 起動時に必須のモデルのみ先に読み込み、終盤・特殊キャラ用は後から裏で読み込む（初回表示を高速化）
 const MODELS = ['vb-hero-van', 'vb-hero-rei', 'enemy-walker'];
-const DEFERRED = ['overlord', 'vb-operator-brute', 'vb-staff-hornet2', 'vb-staff-sage'];
+const DEFERRED = ['vb-operator-brute', 'vb-staff-hornet2', 'vb-staff-sage'];
 const pendingModels = {};
 const TEXTURES = ['vb-tile-floor', 'vb-tile-wall', 'vb-bossroom-wall', 'vb-bg-city', 'vb-bg-fortress', 'vb-i-hs', 'vb-i-hl', 'vb-i-en', 'vb-i-up', 'vb-i-tank'];
 
@@ -41,6 +41,10 @@ let gltfLoader = null;
 export function ensureModel(name) {
   if (models[name]) {
     return Promise.resolve(models[name]);
+  }
+  // パス注入対策：英小文字・数字・ハイフンのみ許可
+  if (typeof name !== 'string' || !/^[a-z0-9-]{1,40}$/.test(name)) {
+    return Promise.resolve(null);
   }
   if (!pendingModels[name]) {
     gltfLoader = gltfLoader || new GLTFLoader();
@@ -92,6 +96,10 @@ export function makeModel(name, { height = 1.7, tint = null, emissive = null } =
   const src = models[name];
   if (!src && DEFERRED.includes(name)) {
     ensureModel(name); // 未読込なら読み込み開始（呼び出し側が後で作り直す）
+  }
+  if (!src && /^vb-(boss-|hid-|op-boss|fused|guardian|overlord)/.test(name)) {
+    ensureModel(name); // ボスは必要時のみ読み込み。間に合わない時は既存メカで代用
+    if (models['enemy-walker']) return makeModel('enemy-walker', { height, tint: tint ?? 0xcc4444, emissive: emissive ?? tint });
   }
   if (!src) {
     inner.add(fallbackRobot(height, tint));

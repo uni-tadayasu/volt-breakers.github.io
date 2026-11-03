@@ -57,7 +57,7 @@ export const WEAKNESS = {
 
 export function bossDef(b, i, hp = 32) {
   return {
-    id: b.id, name: b.name, model: 'boss-mech', color: b.color, weapon: b.weapon,
+    id: b.id, name: b.name, model: 'vb-boss-' + b.id, color: b.color, weapon: b.weapon,
     weapons: [b.weapon, 'buster'], hp, height: 2.3,
     weakness: WEAKNESS[b.id],
     portrait: `assets/vb-p-${b.id}.webp`,
@@ -65,17 +65,30 @@ export function bossDef(b, i, hp = 32) {
 }
 
 function hiddenDef(h) {
-  return { ...h, model: 'boss-mech', hp: 24, height: 2.2, weakness: 'saber' };
+  return { ...h, model: 'vb-hid-' + h.id, hp: 24, height: 2.2, weakness: 'saber' };
 }
 
-export const INTRO_BOSS = { id: 'vile', name: 'ゲイル・ランサー', model: 'boss-mech', color: 0x7a3cff, weapon: 'homing', weapons: ['buster', 'homing'], hp: 22, height: 2.4, weakness: 'buster', portrait: 'assets/vb-p-vile.webp' };
-export const FUSED = { id: 'trinity', name: 'トリニティ・ハイドラ', model: 'boss-mech', color: 0x3a2050, emissive: 0xff2266, weapon: 'laser', weapons: ['laser', 'spark', 'fire', 'homing'], hp: 44, height: 3.4, weakness: 'ice', portrait: 'assets/vb-p-shadow.webp' };
-export const GUARDIAN = { id: 'guardian', name: 'ゲートキーパーΛ', model: 'boss-mech', color: 0xd8b040, weapon: 'quake', weapons: ['quake', 'spread', 'boomerang'], hp: 40, height: 2.9, weakness: 'spark', portrait: 'assets/vb-p-guardian.webp' };
-export const OVERLORD = { id: 'overlord', name: 'オーバーロード・ザイン', model: 'overlord', color: null, weapon: 'laser', weapons: ['laser', 'spread', 'buster'], phase2Weapons: ['laser', 'homing', 'fire', 'spread', 'spark'], hp: 36, height: 2.8, weakness: 'boomerang', phase2: true, portrait: 'assets/vb-p-overlord.webp' };
+export const INTRO_BOSS = { id: 'vile', name: 'ゲイル・ランサー', model: 'vb-op-boss', color: 0x55ee44, weapon: 'homing', weapons: ['buster', 'homing'], hp: 22, height: 2.4, weakness: 'buster', portrait: 'assets/vb-p-vile.webp' };
+export const FUSED = { id: 'trinity', name: 'トリニティ・ハイドラ', model: 'vb-fused', color: 0x3a2050, emissive: 0xff2266, weapon: 'laser', weapons: ['laser', 'spark', 'fire', 'homing'], hp: 44, height: 3.4, weakness: 'ice', portrait: 'assets/vb-p-shadow.webp' };
+export const GUARDIAN = { id: 'guardian', name: 'ゲートキーパーΛ', model: 'vb-guardian', color: 0xd8b040, weapon: 'quake', weapons: ['quake', 'spread', 'boomerang'], hp: 40, height: 2.9, weakness: 'spark', portrait: 'assets/vb-p-guardian.webp' };
+export const OVERLORD = { id: 'overlord', name: 'オーバーロード・ザイン', model: 'vb-overlord', phase2Model: 'vb-overlord2', color: null, weapon: 'laser', weapons: ['laser', 'spread', 'buster'], phase2Weapons: ['laser', 'homing', 'fire', 'spread', 'spark'], hp: 36, height: 2.8, weakness: 'boomerang', phase2: true, portrait: 'assets/vb-p-overlord.webp' };
+
+// 8ステージそれぞれ異なるタイル色（床／壁）。共通テクスチャに色を乗せるので追加DLなし
+const TILE_COLORS = [
+  { floor: 0xff9a6a, wall: 0xc8604a }, // 炎：赤橙
+  { floor: 0x9ae8ff, wall: 0x6aa8d8 }, // 氷：水色
+  { floor: 0xb8f0c0, wall: 0x78b890 }, // 風：若草
+  { floor: 0xfff07a, wall: 0xc8b048 }, // 雷：黄
+  { floor: 0xd8b088, wall: 0x987050 }, // 地：茶
+  { floor: 0x9ad870, wall: 0x5e9a48 }, // 植物：緑
+  { floor: 0xe0a8ff, wall: 0xa070d0 }, // 光：紫
+  { floor: 0x7ab8ff, wall: 0x4a70c0 }, // 水：青
+];
 
 function makeBossStage(i) {
   const b = BOSSES[i];
   return {
+    tile: TILE_COLORS[i % TILE_COLORS.length],
     id: 's' + i, name: b.area, boss: b, seed: 1000 + i * 77, length: 165,
     bg: b.bg, fog: b.fog, accent: b.color, enemies: b.enemies, density: 2,
     bosses: [bossDef(b, i)],
