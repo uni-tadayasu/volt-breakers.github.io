@@ -85,6 +85,10 @@ function geo() {
   GEO.box = new THREE.BoxGeometry(1, 1, 1);
   GEO.torus = new THREE.TorusGeometry(0.7, 0.12, 6, 16);
   GEO.cyl = new THREE.CylinderGeometry(0.18, 0.18, 0.9, 8).rotateZ(Math.PI / 2);
+  GEO.cone = new THREE.ConeGeometry(0.5, 1, 8);
+  GEO.oct = new THREE.OctahedronGeometry(1, 0);
+  GEO.ring = new THREE.RingGeometry(0.8, 1, 24);
+  GEO.ico = new THREE.IcosahedronGeometry(1, 0);
   return GEO;
 }
 
@@ -120,7 +124,7 @@ class Particles {
   constructor(scene) {
     this.pool = [];
     this.live = [];
-    for (let i = 0; i < 240; i++) {
+    for (let i = 0; i < 520; i++) {
       const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false }));
       s.visible = false;
       scene.add(s);
@@ -177,6 +181,17 @@ const ENEMY_TYPES = {
   turret: { hp: 4, w: 1.0, h: 1.0 },
   hopper: { hp: 3, w: 0.9, h: 1.0 },
   shielder: { hp: 5, w: 1.0, h: 1.5 },
+  // ---- 追加バリエーション ----
+  bomber: { hp: 3, w: 1.1, h: 0.8, fly: true },     // 上空から爆弾投下
+  sniper: { hp: 4, w: 1.0, h: 1.3 },                // 予告線→高速レーザー
+  roller: { hp: 3, w: 0.9, h: 0.9 },                // 高速で転がる棘玉
+  mine: { hp: 2, w: 0.8, h: 0.6 },                  // 近づくと全方位炸裂
+  bat: { hp: 2, w: 0.8, h: 0.6, fly: true },        // 急降下アタック
+  mortar: { hp: 5, w: 1.2, h: 1.1 },                // 放物線の迫撃砲
+  heavy: { hp: 9, w: 1.3, h: 1.9 },                 // 重装：3WAY弾＋踏み込み
+  splitter: { hp: 4, w: 1.0, h: 1.0 },              // 倒すと2体に分裂
+  mini: { hp: 1, w: 0.6, h: 0.6 },                  // 分裂体・召喚体
+  orbiter: { hp: 4, w: 0.9, h: 0.9, fly: true },    // 回転バリア弾を纏う浮遊機
 };
 
 function stdMat(color, emissive = 0x000000) {
@@ -214,6 +229,125 @@ function makePrimEnemy(type) {
     eye.scale.setScalar(0.1);
     eye.position.set(0, 0.75, 0.35);
     inner.add(base, dome, barrel, eye);
+  } else if (type === 'bomber') {
+    const body = new THREE.Mesh(g.box, stdMat(0x4a3a60, 0x220a33));
+    body.scale.set(1.1, 0.35, 0.7);
+    body.position.y = 0.45;
+    const wingL = new THREE.Mesh(g.box, stdMat(0x2a2236));
+    wingL.scale.set(0.3, 0.08, 1.3);
+    wingL.position.set(0, 0.55, 0);
+    const pod = new THREE.Mesh(g.sphere, stdMat(0x222222, 0xff5500));
+    pod.scale.setScalar(0.22);
+    pod.position.set(0, 0.2, 0);
+    const eye = new THREE.Mesh(g.sphere, basicMat(0xff66ff));
+    eye.scale.setScalar(0.1);
+    eye.position.set(0, 0.45, 0.38);
+    inner.add(body, wingL, pod, eye);
+  } else if (type === 'sniper') {
+    const leg = new THREE.Mesh(g.cone, stdMat(0x2f3540));
+    leg.scale.set(1.2, 0.7, 1.2);
+    leg.position.y = 0.35;
+    const head = new THREE.Mesh(g.box, stdMat(0x5a6070, 0x003322));
+    head.scale.set(0.55, 0.45, 0.55);
+    head.position.y = 0.95;
+    const barrel = new THREE.Mesh(g.cyl, stdMat(0x15181d));
+    barrel.scale.set(1, 0.7, 0.7);
+    barrel.rotation.y = Math.PI / 2;
+    barrel.position.set(0, 0.98, 0.55);
+    const lens = new THREE.Mesh(g.sphere, basicMat(0x33ffcc));
+    lens.scale.setScalar(0.11);
+    lens.position.set(0, 1.0, 0.3);
+    inner.add(leg, head, barrel, lens);
+  } else if (type === 'roller' || type === 'mini') {
+    const s = type === 'mini' ? 0.62 : 1;
+    const ball = new THREE.Mesh(g.ico, stdMat(type === 'mini' ? 0x7a4aa0 : 0x707a88, type === 'mini' ? 0x3a0a55 : 0x110000));
+    ball.scale.setScalar(0.42 * s);
+    ball.position.y = 0.45 * s;
+    inner.add(ball);
+    for (let i = 0; i < 6; i++) {
+      const sp = new THREE.Mesh(g.cone, stdMat(0xcccccc));
+      sp.scale.set(0.18 * s, 0.35 * s, 0.18 * s);
+      const a = (i / 6) * Math.PI * 2;
+      sp.position.set(Math.cos(a) * 0.45 * s, 0.45 * s + Math.sin(a) * 0.45 * s, 0);
+      sp.rotation.z = a - Math.PI / 2;
+      ball.add(sp);
+      sp.position.set(Math.cos(a) * 1.05, Math.sin(a) * 1.05, 0);
+      sp.scale.set(0.4, 0.8, 0.4);
+    }
+    const eye = new THREE.Mesh(g.sphere, basicMat(0xff3344));
+    eye.scale.setScalar(0.1 * s);
+    eye.position.set(0, 0.5 * s, 0.4 * s);
+    inner.add(eye);
+    inner.userData.spin = ball;
+  } else if (type === 'mine') {
+    const base = new THREE.Mesh(g.sphere, stdMat(0x2a2a2a));
+    base.scale.set(0.42, 0.25, 0.42);
+    base.position.y = 0.2;
+    const lamp = new THREE.Mesh(g.sphere, basicMat(0xff2222));
+    lamp.scale.setScalar(0.12);
+    lamp.position.y = 0.45;
+    inner.add(base, lamp);
+    for (let i = 0; i < 4; i++) {
+      const sp = new THREE.Mesh(g.cone, stdMat(0x777777));
+      sp.scale.set(0.12, 0.3, 0.12);
+      const a = (i / 4) * Math.PI * 2;
+      sp.position.set(Math.cos(a) * 0.4, 0.25, Math.sin(a) * 0.4);
+      sp.rotation.set(Math.sin(a) * 1.3, 0, -Math.cos(a) * 1.3);
+      inner.add(sp);
+    }
+    inner.userData.lamp = lamp;
+  } else if (type === 'bat') {
+    const body = new THREE.Mesh(g.sphere, stdMat(0x302040, 0x220022));
+    body.scale.set(0.3, 0.28, 0.3);
+    body.position.y = 0.3;
+    const wl = new THREE.Mesh(g.cone, stdMat(0x1a1024, 0x440044));
+    wl.scale.set(0.5, 0.06, 0.9);
+    wl.rotation.x = Math.PI / 2;
+    wl.position.set(0, 0.35, 0);
+    const eye = new THREE.Mesh(g.sphere, basicMat(0xffee33));
+    eye.scale.setScalar(0.08);
+    eye.position.set(0, 0.35, 0.27);
+    inner.add(body, wl, eye);
+    inner.userData.wing = wl;
+  } else if (type === 'mortar') {
+    const base = new THREE.Mesh(g.box, stdMat(0x40463a));
+    base.scale.set(1.2, 0.45, 1);
+    base.position.y = 0.22;
+    const tube = new THREE.Mesh(g.cyl, stdMat(0x22261e, 0x221100));
+    tube.scale.set(1.2, 1.6, 1.6);
+    tube.rotation.z = Math.PI / 2 + 0.6;
+    tube.rotation.y = Math.PI / 2;
+    tube.position.set(0, 0.75, 0.15);
+    const lamp = new THREE.Mesh(g.sphere, basicMat(0xffaa00));
+    lamp.scale.setScalar(0.09);
+    lamp.position.set(0.3, 0.5, 0.45);
+    inner.add(base, tube, lamp);
+  } else if (type === 'splitter') {
+    const body = new THREE.Mesh(g.oct, stdMat(0x5a2a7a, 0x330055));
+    body.scale.setScalar(0.5);
+    body.position.y = 0.55;
+    const core = new THREE.Mesh(g.sphere, basicMat(0xcc66ff));
+    core.scale.setScalar(0.16);
+    core.position.set(0, 0.55, 0.3);
+    inner.add(body, core);
+    inner.userData.spin = body;
+  } else if (type === 'orbiter') {
+    const body = new THREE.Mesh(g.ico, stdMat(0x3a5060, 0x003344));
+    body.scale.setScalar(0.38);
+    body.position.y = 0.45;
+    const eye = new THREE.Mesh(g.sphere, basicMat(0x33ddff));
+    eye.scale.setScalar(0.12);
+    eye.position.set(0, 0.45, 0.35);
+    inner.add(body, eye);
+    for (let i = 0; i < 3; i++) {
+      const o = new THREE.Mesh(g.sphere, basicMat(0x66eeff));
+      o.scale.setScalar(0.13);
+      const s = new THREE.Sprite(spriteMat(0x33ccff));
+      s.scale.setScalar(6);
+      o.add(s);
+      group.add(o);
+      (group.userData.orbs = group.userData.orbs || []).push(o);
+    }
   } else {
     const body = new THREE.Mesh(g.sphere, stdMat(0x8a6a30));
     body.scale.set(0.45, 0.4, 0.45);
@@ -465,7 +599,8 @@ export class Game {
       for (let i = 0; i < cnt; i++) {
         const type = st.enemies[Math.floor(R() * st.enemies.length)];
         const ex = x + 2 + R() * (len - 4);
-        this.spawns.push({ type, x: ex, y: type === 'drone' ? nh + 2.5 + R() * 1.5 : nh, done: false });
+        const fl = ENEMY_TYPES[type] && ENEMY_TYPES[type].fly;
+        this.spawns.push({ type, x: ex, y: fl ? nh + 2.5 + R() * 1.5 : nh, done: false });
       }
       // 隠し特殊能力装置：壁蹴りで登る縦穴の頂上
       if (st.part && !this.capsuleSpot && x > L * 0.6 && len > 9 && !gap) {
@@ -494,7 +629,7 @@ export class Game {
     blk(right, h, right + 6, h + 60); // back wall
     plat(gateX + 3, h + 4.2, gateX + 6.5);
     plat(right - 6.5, h + 4.2, right - 3);
-    const corrType = st.enemies.find(e => e !== 'drone') || 'walker';
+    const corrType = st.enemies.find(e => !(ENEMY_TYPES[e] && ENEMY_TYPES[e].fly) && e !== 'mine') || 'walker';
     this.spawns.push({ type: corrType, x: rx + CORR * 0.55, y: h, done: false });
     this.gate = { x0: gateX - 0.7, y0: corrTop, x1: gateX, y1: corrTop, kind: 'block', closedY0: h, openY0: corrTop, active: false };
     this.room = { x0: gateX, x1: right, y: h, top: roomTop, corrTop, cx: (gateX + right) / 2, corrX: rx };
@@ -1094,6 +1229,7 @@ export class Game {
     const x = p.x + p.dir * 0.7;
     const y = p.y + p.h * 0.6;
     this.spawnShot('ally', type, x, y, p.dir, level, myId);
+    this.muzzleFx(type, x, y, p.dir, level);
     this.emitShot(type, x, y, p.dir, level);
     play(type === 'buster' ? 'shot' : 'zap');
   }
@@ -1106,6 +1242,17 @@ export class Game {
     const y = p.y + p.h * 0.55;
     const sh = this.spawnShot('ally', 'slash', x, y, p.dir, p.combo, myId);
     sh.follow = p;
+    // 連撃ごとに異なる斬撃エフェクト
+    const cols = [0x66ff99, 0x99ffcc, 0xffffff];
+    const n = [6, 8, 14][p.combo];
+    for (let k = 0; k < n; k++) {
+      const a = (p.combo === 0 ? 1 : p.combo === 1 ? -1 : 0) * 0.6 + (k / (n - 1) - 0.5) * Math.PI * 0.9;
+      this.particles.emit(p.x + p.dir * Math.cos(a) * 1.1, y + Math.sin(a) * 1.1, cols[p.combo], 1, { speed: 1.5, life: 0.22, size: 0.4 + p.combo * 0.1 });
+    }
+    if (p.combo === 2) {
+      this.particles.emit(x, y, 0x66ff99, 12, { ring: true, speed: 5, life: 0.25, size: 0.4 });
+      this.shake(0.06);
+    }
     this.emitShot('slash', x, y, p.dir, p.combo);
     play('slash');
   }
@@ -1239,6 +1386,12 @@ export class Game {
       default:
         setV(opts.speed || 7); sh.dmg = 2; sh.r = 0.22; color = opts.color || 0xff4466; break;
     }
+    if (opts.color && type !== 'orb') {
+      color = opts.color;
+    }
+    if (opts.ov) {
+      Object.assign(sh, opts.ov);
+    }
     if (team === 'foe' && owner === 'boss') {
       sh.dmg = Math.ceil(sh.dmg * 1.3) + 1;
     }
@@ -1295,10 +1448,191 @@ export class Game {
   removeShot(i, spark = true) {
     const sh = this.shots[i];
     if (spark) {
-      this.particles.emit(sh.x, sh.y, sh.color, 5, { speed: 3, life: 0.25, size: 0.4 });
+      this.impactFx(sh);
     }
     this.world.remove(sh.mesh);
     this.shots.splice(i, 1);
+    if ((sh.beh === 'bomb' || sh.beh === 'arc') && !sh.blasted) {
+      sh.blasted = true;
+      this.blast(sh.x, sh.y, sh.team, sh.color, 1.2);
+    }
+  }
+
+  // 爆風（敵弾の爆弾・迫撃砲・地雷用）
+  blast(x, y, team, color, r) {
+    const b = this.spawnShot(team, 'orb', x, y, 1, 0, 'boss', { speed: 0, color, ov: { r, life: 0.18, pierce: true, walls: false, dmg: 2 } });
+    b.mesh.visible = false;
+    this.particles.emit(x, y, color, 14, { ring: true, speed: 6, life: 0.35, size: 0.7 });
+    this.particles.emit(x, y, 0xffee99, 10, { speed: 4, life: 0.45, size: 0.8 });
+    this.particles.emit(x, y, 0x555555, 6, { speed: 1.5, life: 0.9, size: 1, grav: 2 });
+    if (this.boomCD <= 0) {
+      play('boom');
+      this.boomCD = 0.12;
+    }
+    this.shake(0.12);
+  }
+
+  mineBurst(e) {
+    for (let k = 0; k < 8; k++) {
+      this.spawnShot('foe', 'orb', e.x, e.y + 0.4, 1, 0, 'boss', { angle: (k / 8) * Math.PI * 2, speed: 6, color: 0xff3322 });
+    }
+    this.blast(e.x, e.y + 0.3, 'foe', 0xff4422, 1.4);
+  }
+
+  shake(amt) {
+    this.shakeT = Math.max(this.shakeT || 0, amt);
+  }
+
+  // 技ごとの軌跡エフェクト
+  trailFx(sh) {
+    const R = Math.random();
+    const P = this.particles;
+    switch (sh.type) {
+      case 'buster':
+        if (sh.level === 2) {
+          if (R < 0.9) P.emit(sh.x - sh.vx * 0.02, sh.y + (Math.random() - 0.5) * 0.6, Math.random() < 0.5 ? 0x6fd8ff : 0xffffff, 1, { speed: 1.5, life: 0.3, size: 0.55 });
+          if (R < 0.25) P.emit(sh.x, sh.y, 0xaaf0ff, 3, { ring: true, speed: 2.5, life: 0.18, size: 0.3 });
+        } else if (sh.level === 1 && R < 0.6) {
+          P.emit(sh.x, sh.y, 0x7fffd0, 1, { speed: 0.6, life: 0.22, size: 0.4 });
+        }
+        break;
+      case 'wave':
+        if (R < 0.9) P.emit(sh.x - sh.dir * 0.3, sh.y + (Math.random() - 0.5) * 1.2, Math.random() < 0.6 ? 0x66ff99 : 0xccffdd, 1, { speed: 1, life: 0.35, size: 0.5 });
+        sh.mesh.scale.y = sh.r * 1.2 * (1 + Math.sin(sh.t * 30) * 0.12);
+        break;
+      case 'ice':
+        if (R < 0.6) P.emit(sh.x, sh.y, Math.random() < 0.5 ? 0xbbf4ff : 0xffffff, 1, { speed: 0.8, life: 0.4, size: 0.25, grav: -3 });
+        sh.mesh.rotation.x += 0.4;
+        break;
+      case 'spark':
+        if (R < 0.7) {
+          const a = Math.random() * Math.PI * 2;
+          P.emit(sh.x + Math.cos(a) * sh.r, sh.y + Math.sin(a) * sh.r, Math.random() < 0.5 ? 0xffee55 : 0xffffff, 1, { speed: 4, life: 0.12, size: 0.25 });
+        }
+        sh.mesh.scale.setScalar(sh.r * 0.7 * (0.8 + Math.random() * 0.5));
+        break;
+      case 'laser':
+        if (R < 0.8) P.emit(sh.x - sh.vx * 0.03, sh.y, Math.random() < 0.5 ? sh.color : 0xffffff, 1, { speed: 0.3, life: 0.2, size: 0.35 });
+        break;
+      case 'boomerang':
+        if (R < 0.7) P.emit(sh.x, sh.y, 0xffcc55, 1, { speed: 0.4, life: 0.25, size: 0.45 });
+        break;
+      case 'spreadp':
+        if (R < 0.4) P.emit(sh.x, sh.y, 0xcc88ff, 1, { speed: 0.4, life: 0.25, size: 0.3, grav: -2 });
+        break;
+      case 'homing':
+        if (R < 0.3) P.emit(sh.x, sh.y, 0xffffff, 1, { speed: 0.2, life: 0.2, size: 0.2 });
+        break;
+      case 'fire':
+        if (R < 0.5) P.emit(sh.x, sh.y, Math.random() < 0.5 ? 0xffdd33 : 0xff3300, 1, { speed: 1.2, life: 0.3, size: 0.4, grav: 4 });
+        break;
+      case 'slash':
+        if (R < 0.9) {
+          const a = (Math.random() - 0.5) * Math.PI;
+          P.emit(sh.x + Math.cos(a) * sh.dir, sh.y + Math.sin(a), [0x66ff99, 0x99ffcc, 0xffffff][sh.level] || 0x66ff99, 1, { speed: 2, life: 0.18, size: 0.35 });
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  // 技ごとの着弾エフェクト
+  impactFx(sh) {
+    const P = this.particles;
+    const x = sh.x;
+    const y = sh.y;
+    const c = sh.color || 0xffffff;
+    switch (sh.type) {
+      case 'buster':
+        if (sh.level === 2) {
+          P.emit(x, y, 0x6fd8ff, 16, { ring: true, speed: 7, life: 0.35, size: 0.6 });
+          P.emit(x, y, 0xffffff, 10, { speed: 5, life: 0.3, size: 0.5 });
+          this.shake(0.1);
+        } else if (sh.level === 1) {
+          P.emit(x, y, 0x7fffd0, 10, { ring: true, speed: 4, life: 0.25, size: 0.45 });
+        } else {
+          P.emit(x, y, 0xfff27a, 5, { speed: 3, life: 0.2, size: 0.35 });
+        }
+        break;
+      case 'fire':
+        P.emit(x, y, 0xff5511, 10, { speed: 3, life: 0.45, size: 0.7, grav: 5 });
+        P.emit(x, y, 0xffdd33, 6, { speed: 2, life: 0.3, size: 0.5, grav: 6 });
+        P.emit(x, y, 0x553322, 3, { speed: 1, life: 0.8, size: 0.8, grav: 2 });
+        break;
+      case 'ice':
+        P.emit(x, y, 0xbbf4ff, 10, { speed: 6, life: 0.35, size: 0.3, grav: -12 });
+        P.emit(x, y, 0xffffff, 8, { ring: true, speed: 3, life: 0.25, size: 0.35 });
+        break;
+      case 'homing':
+        P.emit(x, y, c, 10, { ring: true, speed: 4, life: 0.3, size: 0.45 });
+        P.emit(x, y, 0xffffff, 4, { speed: 2, life: 0.25, size: 0.3 });
+        break;
+      case 'spark':
+        for (let k = 0; k < 5; k++) {
+          const a = Math.random() * Math.PI * 2;
+          for (let d = 0.2; d < 1.4; d += 0.3) {
+            P.emit(x + Math.cos(a) * d + (Math.random() - 0.5) * 0.2, y + Math.sin(a) * d + (Math.random() - 0.5) * 0.2, 0xffee55, 1, { speed: 0.2, life: 0.15, size: 0.25 });
+          }
+        }
+        P.emit(x, y, 0xffffff, 6, { ring: true, speed: 5, life: 0.2, size: 0.4 });
+        break;
+      case 'quake':
+        P.emit(x, y + 0.3, 0xd29a5a, 12, { speed: 5, life: 0.5, size: 0.6, grav: -14 });
+        P.emit(x, y + 0.2, 0x776655, 6, { speed: 1.5, life: 0.8, size: 1, grav: 1 });
+        this.shake(0.08);
+        break;
+      case 'boomerang':
+        P.emit(x, y, 0xffaa33, 10, { ring: true, speed: 5, life: 0.25, size: 0.4 });
+        P.emit(x, y, 0xffffff, 6, { speed: 6, life: 0.15, size: 0.25 });
+        break;
+      case 'laser':
+        P.emit(x, y, c, 12, { ring: true, speed: 6, life: 0.3, size: 0.4 });
+        P.emit(x, y, 0xffffff, 6, { ring: true, speed: 2.5, life: 0.2, size: 0.5 });
+        break;
+      case 'spreadp':
+        P.emit(x, y, 0xaa66ff, 6, { speed: 2.5, life: 0.4, size: 0.5, grav: -6 });
+        P.emit(x, y, 0x66ff66, 3, { speed: 1, life: 0.6, size: 0.6, grav: 1 });
+        break;
+      case 'wave':
+      case 'slash':
+        P.emit(x, y, 0x66ff99, 10, { ring: true, speed: 5, life: 0.25, size: 0.45 });
+        P.emit(x, y, 0xffffff, 6, { speed: 4, life: 0.2, size: 0.3 });
+        break;
+      default:
+        P.emit(x, y, c, 6, { speed: 3, life: 0.25, size: 0.4 });
+        break;
+    }
+  }
+
+  // 発射時のマズルフラッシュ（技ごと）
+  muzzleFx(type, x, y, dir, level) {
+    const P = this.particles;
+    const c = (WEAPONS[type] && WEAPONS[type].color) || 0xffffff;
+    if (type === 'buster') {
+      const col = [0xfff27a, 0x7fffd0, 0x6fd8ff][level] || 0xfff27a;
+      P.emit(x, y, col, 4 + level * 6, { ring: true, speed: 2 + level * 2, life: 0.15 + level * 0.05, size: 0.3 + level * 0.15 });
+      if (level === 2) {
+        P.emit(x - dir * 0.3, y, 0xffffff, 8, { speed: 5, life: 0.2, size: 0.4 });
+        this.shake(0.08);
+      }
+    } else if (type === 'wave') {
+      P.emit(x, y, 0x66ff99, 16, { ring: true, speed: 5, life: 0.3, size: 0.5 });
+      this.shake(0.08);
+    } else if (type === 'fire') {
+      P.emit(x, y, 0xff6622, 8, { speed: 3, life: 0.3, size: 0.6, grav: 4 });
+    } else if (type === 'ice') {
+      P.emit(x, y, 0xccf6ff, 8, { ring: true, speed: 3, life: 0.2, size: 0.3 });
+    } else if (type === 'spark') {
+      P.emit(x, y, 0xffee55, 10, { speed: 6, life: 0.12, size: 0.25 });
+    } else if (type === 'quake') {
+      P.emit(x, y - 0.8, 0xd29a5a, 10, { speed: 4, life: 0.4, size: 0.6, grav: -10 });
+      this.shake(0.1);
+    } else if (type === 'laser') {
+      P.emit(x, y, c, 6, { ring: true, speed: 1.5, life: 0.25, size: 0.6 });
+    } else {
+      P.emit(x, y, c, 6, { ring: true, speed: 2.5, life: 0.2, size: 0.35 });
+    }
   }
 
   hitTest(sh, b) {
@@ -1383,9 +1717,43 @@ export class Game {
           }
           sh.mesh.scale.y = 0.6 + Math.abs(Math.sin(sh.t * 18)) * 0.6;
           break;
+        case 'arc':
+        case 'bomb':
+          sh.vy += GRAV * (sh.beh === 'bomb' ? 0.9 : 0.6) * dt;
+          if (Math.random() < 0.5) {
+            this.particles.emit(sh.x, sh.y, 0x888888, 1, { speed: 0.5, life: 0.4, size: 0.4, grav: 1.5 });
+          }
+          break;
+        case 'tornado':
+          sh.vy = Math.sin(sh.t * 4) * 1.5;
+          sh.mesh.rotation.y += dt * 14;
+          if (Math.random() < 0.8) {
+            const a = sh.t * 20;
+            this.particles.emit(sh.x + Math.cos(a) * sh.r, sh.y - sh.r + Math.random() * sh.r * 2, sh.color, 1, { speed: 0.6, life: 0.35, size: 0.4, grav: 3 });
+          }
+          break;
+        case 'spiral':
+          sh.ang = (sh.ang || 0) + dt * (sh.spin || 2);
+          sh.vx = Math.cos(sh.ang) * sh.spd;
+          sh.vy = Math.sin(sh.ang) * sh.spd;
+          break;
+        case 'delay':
+          // 一時停止してから狙い撃ち
+          if (sh.t < sh.wait) {
+            sh.vx *= 0.9;
+            sh.vy *= 0.9;
+          } else if (!sh.fired) {
+            sh.fired = true;
+            const a = Math.atan2(p.y + 0.9 - sh.y, p.x - sh.x);
+            sh.vx = Math.cos(a) * 11;
+            sh.vy = Math.sin(a) * 11;
+            this.particles.emit(sh.x, sh.y, sh.color, 6, { ring: true, speed: 2, life: 0.2 });
+          }
+          break;
         default:
           break;
       }
+      this.trailFx(sh);
       sh.x += sh.vx * dt;
       sh.y += sh.vy * dt;
       sh.mesh.position.set(sh.x, sh.y, 0.3);
@@ -1490,8 +1858,8 @@ export class Game {
   spawnEnemy(type, x, y) {
     const def = ENEMY_TYPES[type] || ENEMY_TYPES.walker;
     let rig;
-    if (type === 'walker' || type === 'shielder') {
-      rig = makeModel('enemy-walker', { height: def.h + 0.1, tint: type === 'shielder' ? 0x6677aa : null });
+    if (type === 'walker' || type === 'shielder' || type === 'heavy') {
+      rig = makeModel('enemy-walker', { height: def.h + 0.1, tint: type === 'shielder' ? 0x6677aa : type === 'heavy' ? 0x8a2a22 : null, emissive: type === 'heavy' ? 0x551100 : null });
       if (type === 'shielder') {
         const sm = new THREE.Mesh(geo().box, stdMat(0x3a6aff, 0x2244ff));
         sm.scale.set(0.15, 1.2, 0.9);
@@ -1503,7 +1871,7 @@ export class Game {
       rig = makePrimEnemy(type);
     }
     this.world.add(rig.group);
-    const e = { type, rig, x, y, baseY: y, w: def.w, h: def.h, vx: 0, vy: 0, hp: def.hp, dir: -1, t: Math.random() * 2, shootT: 1.5 + Math.random(), fly: !!def.fly, flash: 0, onGround: false };
+    const e = { type, rig, x, y, baseY: y, w: def.w, h: def.h, vx: 0, vy: 0, hp: def.hp, dir: -1, t: Math.random() * 2, shootT: 1.5 + Math.random(), fly: !!def.fly, flash: 0, onGround: false, st: 0, aimT: 0 };
     this.enemies.push(e);
     return e;
   }
@@ -1511,8 +1879,28 @@ export class Game {
   killEnemy(e) {
     e.dead = true;
     this.world.remove(e.rig.group);
-    this.particles.emit(e.x, e.y + e.h / 2, 0xffaa33, 14, { speed: 5, life: 0.5, size: 0.7 });
-    this.particles.emit(e.x, e.y + e.h / 2, 0xffffff, 6, { ring: true, speed: 3, life: 0.3 });
+    const EXC = { bomber: 0xff66ff, sniper: 0x33ffcc, roller: 0xcccccc, mine: 0xff3322, bat: 0xcc44ff, mortar: 0xffaa00, heavy: 0xff4422, splitter: 0xcc66ff, mini: 0xaa55ff, orbiter: 0x33ddff };
+    const ec = EXC[e.type] || 0xffaa33;
+    const cy = e.y + e.h / 2;
+    this.particles.emit(e.x, cy, ec, 14, { speed: 5, life: 0.5, size: 0.7 });
+    this.particles.emit(e.x, cy, 0xffffff, 8, { ring: true, speed: 3, life: 0.3 });
+    this.particles.emit(e.x, cy, 0x666677, 6, { speed: 2.5, life: 0.8, size: 0.9, grav: 2 }); // 煙
+    this.particles.emit(e.x, cy, 0xffdd88, 6, { speed: 7, life: 0.35, size: 0.25, grav: -14 }); // 破片
+    if (e.type === 'heavy') {
+      this.particles.emit(e.x, cy, 0xff8844, 16, { ring: true, speed: 6, life: 0.6, size: 0.9 });
+      this.shake(0.25);
+    }
+    if (e.type === 'mine') {
+      this.mineBurst(e);
+    }
+    if (e.type === 'splitter') {
+      for (const d of [-1, 1]) {
+        const m = this.spawnEnemy('mini', e.x + d * 0.4, e.y + 0.2);
+        m.vx = d * 3;
+        m.vy = 6;
+        m.dir = d;
+      }
+    }
     if (this.boomCD <= 0) {
       play('boom');
       this.boomCD = 0.15;
@@ -1587,8 +1975,193 @@ export class Game {
             }
           }
           break;
+        case 'bomber': {
+          // プレイヤーの頭上へ移動して爆弾投下
+          e.dir = toP;
+          e.x += clamp(p.x - e.x, -1, 1) * 2.2 * dt;
+          e.y = Math.max(e.baseY, p.y + 4.2) + Math.sin(e.t * 3) * 0.25;
+          if (e.shootT <= 0 && Math.abs(p.x - e.x) < 2.5) {
+            e.shootT = 1.6;
+            this.spawnShot('foe', 'orb', e.x, e.y + 0.1, e.dir, 0, 'boss', { angle: -Math.PI / 2, speed: 1, color: 0xff5500, ov: { beh: 'bomb', r: 0.3 } });
+          }
+          break;
+        }
+        case 'sniper':
+          e.dir = toP;
+          e.vx = 0;
+          if (e.st === 0 && e.shootT <= 0) {
+            e.st = 1;
+            e.aimT = 0.9;
+            e.lockA = aim;
+          }
+          if (e.st === 1) {
+            e.aimT -= dt;
+            // 予告線
+            const k = 1 - e.aimT / 0.9;
+            for (let d = 1; d < 14; d += 1.4) {
+              if (Math.random() < 0.25 + k * 0.3) {
+                this.particles.emit(e.x + Math.cos(e.lockA) * d, e.y + 1 + Math.sin(e.lockA) * d, 0x33ffcc, 1, { speed: 0, life: 0.08, size: 0.22 });
+              }
+            }
+            if (e.aimT <= 0) {
+              e.st = 0;
+              e.shootT = 2.6;
+              this.spawnShot('foe', 'laser', e.x, e.y + 1, e.dir, 0, 'boss', { angle: e.lockA, color: 0x33ffcc });
+              this.particles.emit(e.x + e.dir * 0.6, e.y + 1, 0x99ffee, 8, { ring: true, speed: 3, life: 0.2 });
+              play('zap');
+            }
+          }
+          break;
+        case 'roller':
+        case 'mini':
+          if (e.st === 0) {
+            e.dir = toP;
+            e.st = 1;
+          }
+          e.vx = e.dir * (e.type === 'mini' ? 3.2 : 5.2);
+          if (e.rig.inner.userData.spin) {
+            e.rig.inner.userData.spin.rotation.z -= e.vx * dt * 2.2;
+          }
+          if (Math.abs(p.x - e.x) > 9 && Math.sign(p.x - e.x) !== e.dir) {
+            e.dir = toP;
+          }
+          if (e.onGround && Math.random() < 0.15) {
+            this.particles.emit(e.x - e.dir * 0.3, e.y + 0.05, 0xffcc88, 1, { speed: 1.5, life: 0.2, size: 0.25 });
+          }
+          break;
+        case 'mine': {
+          e.vx = 0;
+          const near = Math.hypot(p.x - e.x, p.y - e.y) < 3;
+          if (near && e.st === 0) {
+            e.st = 1;
+            e.aimT = 0.7;
+            play('warn');
+          }
+          if (e.rig.inner.userData.lamp) {
+            e.rig.inner.userData.lamp.visible = e.st === 0 ? Math.floor(e.t * 2) % 2 === 0 : Math.floor(e.t * 16) % 2 === 0;
+          }
+          if (e.st === 1) {
+            e.aimT -= dt;
+            if (e.aimT <= 0) {
+              e.hp = 0;
+              this.killEnemy(e);
+            }
+          }
+          break;
+        }
+        case 'bat':
+          e.dir = toP;
+          if (e.st === 0) {
+            e.x += clamp(p.x - e.x, -1, 1) * 1.6 * dt;
+            e.y = e.baseY + Math.sin(e.t * 4) * 0.4;
+            if (e.shootT <= 0 && Math.abs(p.x - e.x) < 6) {
+              e.st = 1;
+              e.aimT = 0;
+              e.sx = e.x;
+              e.sy = e.y;
+              e.tx = p.x;
+              e.ty = p.y + 0.4;
+            }
+          } else {
+            e.aimT += dt / 1.1;
+            const k = Math.min(1, e.aimT);
+            const dip = Math.sin(k * Math.PI);
+            e.x = e.sx + (e.tx - e.sx) * k * 2;
+            e.y = e.sy + (e.ty - e.sy) * dip;
+            if (k >= 1) {
+              e.st = 0;
+              e.baseY = e.y;
+              e.shootT = 2.2;
+            }
+          }
+          if (e.rig.inner.userData.wing) {
+            e.rig.inner.userData.wing.scale.x = 0.5 + Math.abs(Math.sin(e.t * 18)) * 0.5;
+          }
+          break;
+        case 'mortar':
+          e.dir = toP;
+          e.vx = 0;
+          if (e.shootT <= 0 && Math.abs(p.x - e.x) < 15) {
+            e.shootT = 2.8;
+            const dx = p.x - e.x;
+            const tFlight = 1.25;
+            const g = GRAV * 0.6;
+            const vx = dx / tFlight;
+            const vy = (p.y - (e.y + 1) - 0.5 * g * tFlight * tFlight) / tFlight;
+            const sh = this.spawnShot('foe', 'orb', e.x + e.dir * 0.4, e.y + 1, e.dir, 0, 'boss', { color: 0xffaa00, ov: { beh: 'arc', r: 0.32, life: 3 } });
+            sh.vx = vx;
+            sh.vy = vy;
+            this.particles.emit(e.x + e.dir * 0.4, e.y + 1.2, 0xaaaaaa, 6, { speed: 2, life: 0.5, size: 0.6, grav: 2 });
+            play('shot');
+          }
+          break;
+        case 'heavy':
+          e.dir = toP;
+          e.vx = e.st === 1 ? e.dir * 6 : e.dir * 0.7;
+          if (e.st === 1) {
+            e.aimT -= dt;
+            if (Math.random() < 0.5) {
+              this.particles.emit(e.x - e.dir * 0.5, e.y + 0.2, 0xff8844, 1, { speed: 2, life: 0.3, size: 0.5 });
+            }
+            if (e.aimT <= 0) {
+              e.st = 0;
+            }
+          }
+          if (e.shootT <= 0) {
+            e.shootT = 3;
+            if (Math.random() < 0.5 && Math.abs(p.x - e.x) < 7) {
+              e.st = 1;
+              e.aimT = 0.6;
+            } else {
+              for (const da of [-0.25, 0, 0.25]) {
+                this.spawnShot('foe', 'orb', e.x + e.dir * 0.7, e.y + e.h * 0.6, e.dir, 0, 'boss', { angle: (e.dir > 0 ? 0 : Math.PI) + da, color: 0xff5533 });
+              }
+            }
+          }
+          break;
+        case 'splitter':
+          e.dir = toP;
+          if (e.onGround) {
+            e.vx = 0;
+            if (e.shootT <= 0) {
+              e.shootT = 1.8;
+              e.vy = 8;
+              e.vx = e.dir * 2.5;
+              e.onGround = false;
+              this.spawnShot('foe', 'orb', e.x, e.y + 0.6, e.dir, 0, 'boss', { angle: aim, color: 0xcc66ff });
+            }
+          }
+          if (e.rig.inner.userData.spin) {
+            e.rig.inner.userData.spin.rotation.y += dt * 3;
+          }
+          break;
+        case 'orbiter': {
+          e.dir = toP;
+          e.x += clamp(p.x - e.x, -1, 1) * 0.9 * dt;
+          e.y = e.baseY + Math.sin(e.t * 1.8) * 0.8;
+          const orbs = e.rig.group.userData.orbs || [];
+          orbs.forEach((o, k) => {
+            const a = e.t * 3 + (k / orbs.length) * Math.PI * 2;
+            o.position.set(Math.cos(a) * 1.25, 0.45 + Math.sin(a) * 1.25, 0.2);
+            const ox = e.x + o.position.x;
+            const oy = e.y + o.position.y;
+            if (!p.dead && Math.abs(ox - p.x) < 0.5 && oy > p.y && oy < p.y + p.h) {
+              this.hurtPlayer(2, 'boss');
+            }
+          });
+          if (e.shootT <= 0) {
+            e.shootT = 3.4;
+            for (let k = 0; k < 6; k++) {
+              this.spawnShot('foe', 'orb', e.x, e.y + 0.45, e.dir, 0, 'boss', { angle: (k / 6) * Math.PI * 2 + e.t, speed: 5, color: 0x33ddff });
+            }
+          }
+          break;
+        }
         default:
           break;
+      }
+      if (e.dead) {
+        continue;
       }
       if (!e.fly) {
         e.vy = Math.max(-20, e.vy + GRAV * dt);
@@ -1693,6 +2266,7 @@ export class Game {
       hidden: !!opts.hidden, hiddenIdx: opts.hiddenIdx, flash: 0, inv: 0, stun: 0, onGround: false, act: 0,
     };
     this.bosses.push(b);
+    this.decorateBoss(b);
     this.ui.setBoss(0, b.max, def.name);
     this.ui.banner(def.name, 'boss', 2);
     const sid = this.stage.id;
@@ -1805,6 +2379,470 @@ export class Game {
     play('zap');
   }
 
+  // ---- ボス行動バリエーション ----
+  pickBossState(b, fury) {
+    const id = b.def.id;
+    // ボスごとの性格（行動の重み）
+    const PERS = {
+      volca: { shoot: 3, leap: 2, dash: 2, rain: 1, barrage: 2, slam: 2, sig: 3 },
+      frost: { shoot: 3, leap: 1, dash: 2, rain: 2, barrage: 2, spiral: 1, sig: 3 },
+      storm: { shoot: 2, leap: 2, rain: 2, spiral: 3, teleport: 2, sig: 3 },
+      spark: { shoot: 2, dash: 3, leap: 1, teleport: 2, barrage: 1, sig: 3 },
+      quake: { shoot: 1, leap: 3, dash: 2, slam: 3, rain: 1, sig: 3 },
+      boomer: { shoot: 3, dash: 2, leap: 1, spiral: 2, barrage: 1, sig: 3 },
+      laser: { shoot: 3, teleport: 3, barrage: 2, spiral: 1, sig: 3 },
+      scorpio: { shoot: 2, leap: 2, rain: 2, barrage: 2, summon: 2, sig: 3 },
+      overlord: { shoot: 2, leap: 1, dash: 2, rain: 2, barrage: 2, spiral: 2, slam: 1, teleport: 2, summon: 1, sig: 3 },
+      trinity: { shoot: 2, barrage: 3, spiral: 3, summon: 2, sig: 3, rain: 1 },
+      guardian: { shoot: 2, slam: 3, dash: 2, barrage: 2, leap: 2, sig: 2 },
+    };
+    const w = { ...(PERS[id] || { shoot: 3, leap: 2, dash: 2, rain: 1, barrage: 2, spiral: 1, slam: 1, teleport: 1, summon: 1, sig: 2 }) };
+    if (!fury) {
+      w.sig = (w.sig || 0) * 0.5;
+      w.summon = (w.summon || 0) * 0.5;
+    }
+    if (b.lastState && w[b.lastState]) {
+      w[b.lastState] *= 0.35; // 同じ行動の連続を抑える
+    }
+    if (this.enemies.length > 4) {
+      w.summon = 0;
+    }
+    const tot = Object.values(w).reduce((a, c) => a + c, 0);
+    let r = Math.random() * tot;
+    for (const k in w) {
+      r -= w[k];
+      if (r <= 0) {
+        return k;
+      }
+    }
+    return 'shoot';
+  }
+
+  bossSigKind(b) {
+    const MAP = { volca: 'erupt', frost: 'icefall', storm: 'tornado', spark: 'thunder', quake: 'rockfall', boomer: 'blades', laser: 'prism', scorpio: 'acid', guardian: 'rockfall', vile: 'thunder', shadow: 'prism', void: 'thunder', crimsonx: 'erupt' };
+    if (MAP[b.def.id]) {
+      return MAP[b.def.id];
+    }
+    const all = ['erupt', 'icefall', 'tornado', 'thunder', 'rockfall', 'blades', 'prism', 'acid'];
+    if (!b.sigK || b.act === 0) {
+      b.sigK = all[Math.floor(Math.random() * all.length)];
+    }
+    return b.sigK;
+  }
+
+  bossCol(b) {
+    return b.def.emissive || b.def.color || 0xff3344;
+  }
+
+  warnColumn(x, y0, y1, color) {
+    for (let y = y0; y < y1; y += 0.7) {
+      if (Math.random() < 0.5) {
+        this.particles.emit(x + (Math.random() - 0.5) * 0.3, y, color, 1, { speed: 0.2, life: 0.12, size: 0.35 });
+      }
+    }
+  }
+
+  bossPattern(b, dt, fury) {
+    const p = this.player;
+    const rm = this.room;
+    const col = this.bossCol(b);
+    const floorY = rm ? rm.y : this.groundAt(p.x);
+    const topY = rm && !b.hidden ? rm.top - 0.6 : p.y + 9;
+    const done = () => {
+      b.state = 'idle';
+      b.t = 0;
+      b.vx = 0;
+    };
+    const aimP = (ox, oy) => Math.atan2(p.y + 0.9 - oy, p.x - ox);
+    const cx = b.x + b.dir * b.w * 0.6;
+    const cy = b.y + b.h * 0.6;
+    switch (b.state) {
+      case 'barrage': {
+        // 扇状弾幕（3波）
+        const waves = fury ? 3 : 2;
+        if (b.act < waves && b.t > 0.35 + b.act * 0.45) {
+          const n = fury ? 7 : 5;
+          const base = aimP(cx, cy);
+          for (let k = 0; k < n; k++) {
+            const a = base + (k - (n - 1) / 2) * 0.22 + (b.act % 2 ? 0.11 : 0);
+            this.spawnShot('foe', 'orb', cx, cy, b.dir, 0, 'boss', { angle: a, speed: 8, color: col });
+          }
+          this.particles.emit(cx, cy, col, 10, { ring: true, speed: 3, life: 0.2 });
+          play('zap');
+          b.act++;
+        }
+        if (b.t < 0.35) {
+          this.particles.emit(cx, cy, col, 1, { speed: 2, life: 0.2, size: 0.4 });
+        }
+        if (b.t > 0.5 + waves * 0.45) done();
+        break;
+      }
+      case 'spiral': {
+        // 回転しながら全方位に撃つ
+        b.vx = 0;
+        const dur = fury ? 2.2 : 1.6;
+        b.spT = (b.spT || 0) - dt;
+        if (b.t > 0.3 && b.t < dur && b.spT <= 0) {
+          b.spT = fury ? 0.09 : 0.13;
+          const a = b.t * 5.5;
+          const arms = fury ? 3 : 2;
+          for (let k = 0; k < arms; k++) {
+            this.spawnShot('foe', 'orb', b.x, b.y + b.h * 0.55, b.dir, 0, 'boss', { angle: a + (k / arms) * Math.PI * 2, speed: 6, color: col });
+          }
+        }
+        b.rig.group.rotation.y = b.t < dur ? b.t * 12 : 0;
+        if (b.t > dur + 0.3) {
+          b.rig.group.rotation.y = 0;
+          done();
+        }
+        break;
+      }
+      case 'slam': {
+        // 大ジャンプ→急降下→両側に衝撃波
+        if (b.act === 0) {
+          b.vy = 17;
+          b.vx = clamp((p.x - b.x) * 0.9, -7, 7);
+          b.act = 1;
+          b.onGround = false;
+        } else if (b.act === 1 && b.vy < 0) {
+          b.vx = 0;
+          b.vy = -22;
+          b.act = 2;
+        } else if (b.act === 2 && b.onGround) {
+          b.act = 3;
+          play('boom');
+          this.shake(0.35);
+          this.particles.emit(b.x, b.y + 0.2, 0xd2a070, 20, { ring: true, speed: 8, life: 0.5, size: 0.9 });
+          this.particles.emit(b.x, b.y + 0.2, col, 12, { speed: 5, life: 0.5, size: 0.7, grav: -10 });
+          for (const d of [-1, 1]) {
+            this.spawnShot('foe', 'quake', b.x + d * 0.6, b.y + 0.2, d, 0, 'boss', { color: col });
+            if (fury) {
+              const s2 = this.spawnShot('foe', 'quake', b.x + d * 0.6, b.y + 0.2, d, 0, 'boss', { color: 0xffffff });
+              s2.vx *= 0.55;
+            }
+          }
+        }
+        if (b.act === 3 && b.t > 0.4 || b.t > 3) done();
+        break;
+      }
+      case 'teleport': {
+        // 消えてプレイヤーの背後に出現→至近距離ショット
+        if (b.act === 0) {
+          b.act = 1;
+          this.particles.emit(b.x, b.y + b.h / 2, col, 18, { ring: true, speed: 5, life: 0.35, size: 0.6 });
+          play('dash');
+        }
+        if (b.act === 1) {
+          b.rig.group.visible = false;
+          b.inv = 0.1;
+          if (b.t > 0.55) {
+            const side = p.dir > 0 ? -1 : 1;
+            let nx = p.x + side * 3.2;
+            if (rm) nx = clamp(nx, rm.x0 + b.w, rm.x1 - b.w);
+            b.x = nx;
+            b.y = Math.max(floorY, p.y);
+            b.vy = 0;
+            b.dir = p.x < b.x ? -1 : 1;
+            b.act = 2;
+            this.particles.emit(b.x, b.y + b.h / 2, col, 18, { ring: true, speed: 4, life: 0.35, size: 0.6 });
+            this.particles.emit(b.x, b.y + b.h / 2, 0xffffff, 8, { speed: 3, life: 0.3 });
+          }
+        }
+        if (b.act === 2 && b.t > 0.85) {
+          b.act = 3;
+          const w = b.weapons[b.wi];
+          this.bossShoot(b, w, ['homing', 'spark', 'quake', 'boomerang'].includes(w) ? undefined : aimP(cx, cy));
+          if (fury) {
+            for (const da of [-0.3, 0.3]) this.spawnShot('foe', 'orb', cx, cy, b.dir, 0, 'boss', { angle: aimP(cx, cy) + da, speed: 9, color: col });
+          }
+        }
+        if (b.t > 1.4) done();
+        break;
+      }
+      case 'summon': {
+        // 雑魚召喚
+        b.vx = 0;
+        if (b.t < 0.8 && Math.random() < 0.6) {
+          this.particles.emit(b.x + (Math.random() - 0.5) * 2, b.y + Math.random() * b.h, col, 1, { speed: 1, life: 0.4, size: 0.5, grav: -3 });
+        }
+        if (b.act === 0 && b.t > 0.8) {
+          b.act = 1;
+          const pool = ['mini', 'bat', 'mini', 'roller', 'drone'];
+          const n = fury ? 3 : 2;
+          for (let k = 0; k < n; k++) {
+            const tp = pool[Math.floor(Math.random() * pool.length)];
+            let x = b.x + (k - (n - 1) / 2) * 2.4;
+            if (rm) x = clamp(x, rm.x0 + 1.5, rm.x1 - 1.5);
+            const fy = ENEMY_TYPES[tp].fly ? floorY + 3 : floorY + 0.5;
+            this.spawnEnemy(tp, x, fy);
+            this.particles.emit(x, fy + 0.4, col, 12, { ring: true, speed: 3, life: 0.35 });
+          }
+          play('warn');
+        }
+        if (b.t > 1.4) done();
+        break;
+      }
+      case 'sig':
+        this.bossSignature(b, dt, fury, { col, floorY, topY, done, aimP, cx, cy });
+        break;
+      default:
+        done();
+    }
+  }
+
+  bossSignature(b, dt, fury, c) {
+    const p = this.player;
+    const kind = this.bossSigKind(b);
+    const { col, floorY, topY, done, aimP, cx, cy } = c;
+    b.vx = 0;
+    if (b.act === 0) {
+      b.act = 1;
+      b.sigTargets = [];
+      this.ui.toast('⚡ ' + b.def.name + '：' + ({ erupt: 'ボルカニック・ピラー', icefall: 'フロスト・レイン', tornado: 'サイクロン・ゲイル', thunder: 'サンダー・ジャッジ', rockfall: 'ロック・アバランチ', blades: 'ギア・ストーム', prism: 'プリズム・ケージ', acid: 'ミアズマ・シャワー' }[kind]), 1.2);
+      this.particles.emit(b.x, b.y + b.h / 2, col, 20, { ring: true, speed: 6, life: 0.5, size: 0.7 });
+      play('warn');
+    }
+    // 溜めの演出
+    if (b.t < 0.5 && Math.random() < 0.8) {
+      const a = Math.random() * Math.PI * 2;
+      this.particles.emit(b.x + Math.cos(a) * 1.6, b.y + b.h / 2 + Math.sin(a) * 1.6, col, 1, { speed: 0.5, life: 0.25, size: 0.5 });
+    }
+    const roomX = x => (this.room ? clamp(x, this.room.x0 + 0.8, this.room.x1 - 0.8) : x);
+    switch (kind) {
+      case 'erupt': {
+        // 火柱が足元から順番に噴き上がる（予告あり）
+        const n = fury ? 6 : 4;
+        if (b.sigTargets.length === 0) {
+          for (let k = 0; k < n; k++) b.sigTargets.push({ x: roomX(p.x + (k - 1) * 2.6 * (p.x < b.x ? -1 : 1)), t: 0.5 + k * 0.28, fired: false });
+        }
+        for (const s of b.sigTargets) {
+          if (!s.fired && b.t > s.t - 0.5) this.warnColumn(s.x, floorY, floorY + 0.6, 0xff6622);
+          if (!s.fired && b.t > s.t) {
+            s.fired = true;
+            const sh = this.spawnShot('foe', 'quake', s.x, floorY + 0.1, 1, 0, 'boss', { color: 0xff5511, ov: { vx: 0, life: 0.7 } });
+            sh.mesh.scale.set(1, 1.8, 1);
+            this.particles.emit(s.x, floorY + 0.5, 0xffaa33, 14, { speed: 6, life: 0.6, size: 0.7, grav: 6 });
+            play('boom');
+          }
+        }
+        if (b.t > 0.5 + n * 0.28 + 0.6) done();
+        break;
+      }
+      case 'icefall': {
+        const n = fury ? 9 : 6;
+        if (b.sigTargets.length === 0) {
+          for (let k = 0; k < n; k++) b.sigTargets.push({ x: roomX(p.x + (Math.random() - 0.5) * 12), t: 0.6 + k * 0.17, fired: false });
+          b.sigTargets[0].x = p.x;
+        }
+        for (const s of b.sigTargets) {
+          if (!s.fired && b.t > s.t - 0.45) this.warnColumn(s.x, topY - 1.5, topY, 0xbbf4ff);
+          if (!s.fired && b.t > s.t) {
+            s.fired = true;
+            this.spawnShot('foe', 'ice', s.x, topY, 1, 0, 'boss', { angle: -Math.PI / 2, ov: { vy: -14, vx: 0 } });
+          }
+        }
+        if (b.t > 0.6 + n * 0.17 + 0.8) done();
+        break;
+      }
+      case 'tornado': {
+        if (b.act === 1 && b.t > 0.55) {
+          b.act = 2;
+          const dirs = fury ? [-1, 1] : [b.dir];
+          for (const d of dirs) {
+            const sh = this.spawnShot('foe', 'orb', b.x + d, floorY + 1.2, d, 0, 'boss', { speed: 4.5, color: 0x88ffcc, ov: { beh: 'tornado', r: 0.9, pierce: true, walls: false, life: 3.2 } });
+            sh.mesh.scale.set(0.7, 1.6, 0.7);
+          }
+          play('dash');
+        }
+        if (b.t > 1.6) done();
+        break;
+      }
+      case 'thunder': {
+        // プレイヤー位置に落雷（予告→直撃）
+        const n = fury ? 4 : 3;
+        if (b.sigTargets.length === 0) {
+          for (let k = 0; k < n; k++) b.sigTargets.push({ x: 0, t: 0.7 + k * 0.5, locked: false, fired: false });
+        }
+        for (const s of b.sigTargets) {
+          if (!s.locked && b.t > s.t - 0.55) {
+            s.locked = true;
+            s.x = roomX(p.x);
+          }
+          if (s.locked && !s.fired) this.warnColumn(s.x, floorY, topY, 0xffee55);
+          if (!s.fired && b.t > s.t) {
+            s.fired = true;
+            const sh = this.spawnShot('foe', 'laser', s.x, topY, 1, 0, 'boss', { angle: -Math.PI / 2, color: 0xffee55, ov: { life: 0.5 } });
+            sh.vx = 0;
+            sh.vy = -38;
+            this.particles.emit(s.x, floorY + 0.2, 0xffffaa, 16, { ring: true, speed: 6, life: 0.3, size: 0.5 });
+            this.shake(0.15);
+            play('zap');
+          }
+        }
+        if (b.t > 0.7 + n * 0.5 + 0.4) done();
+        break;
+      }
+      case 'rockfall': {
+        const n = fury ? 8 : 5;
+        if (b.act === 1 && b.t > 0.4) {
+          b.act = 2;
+          b.vy = 12;
+          b.onGround = false;
+        }
+        if (b.act === 2 && b.onGround && b.t > 0.6) {
+          b.act = 3;
+          b.t3 = b.t;
+          this.shake(0.3);
+          play('boom');
+          for (let k = 0; k < n; k++) b.sigTargets.push({ x: roomX(p.x + (Math.random() - 0.5) * 10), t: b.t + 0.3 + k * 0.15, fired: false });
+        }
+        for (const s of b.sigTargets) {
+          if (!s.fired && b.t > s.t - 0.4) this.warnColumn(s.x, topY - 1, topY, 0xd2a070);
+          if (!s.fired && b.t > s.t) {
+            s.fired = true;
+            const sh = this.spawnShot('foe', 'orb', s.x, topY, 1, 0, 'boss', { angle: -Math.PI / 2, speed: 2, color: 0xb07a44, ov: { beh: 'bomb', r: 0.45 } });
+            sh.mesh.scale.setScalar(0.5);
+          }
+        }
+        if (b.act === 3 && b.t > b.t3 + 0.5 + n * 0.15 + 0.6 || b.t > 5) done();
+        break;
+      }
+      case 'blades': {
+        if (b.act === 1 && b.t > 0.5) {
+          b.act = 2;
+          const n = fury ? 8 : 6;
+          for (let k = 0; k < n; k++) {
+            const a = (k / n) * Math.PI * 2;
+            const sh = this.spawnShot('foe', 'boomerang', b.x, b.y + b.h * 0.55, 1, 0, 'boss', { ov: { beh: 'spiral', ang: a, spd: 6, spin: 1.6, life: 2.6, walls: false } });
+            sh.vx = Math.cos(a) * 6;
+            sh.vy = Math.sin(a) * 6;
+          }
+          play('slash');
+        }
+        if (b.t > 1.8) done();
+        break;
+      }
+      case 'prism': {
+        // 周囲に光弾を配置→一斉に狙撃
+        if (b.act === 1 && b.t > 0.3) {
+          b.act = 2;
+          const n = fury ? 8 : 6;
+          for (let k = 0; k < n; k++) {
+            const a = (k / n) * Math.PI * 2;
+            this.spawnShot('foe', 'orb', b.x, b.y + b.h * 0.55, 1, 0, 'boss', { angle: a, speed: 6, color: col, ov: { beh: 'delay', wait: 0.7 + k * 0.08, life: 3 } });
+          }
+          play('zap');
+        }
+        if (b.t > 1.9) done();
+        break;
+      }
+      case 'acid': {
+        // 放物線の毒弾を扇状にばら撒く
+        const waves = fury ? 3 : 2;
+        if (b.act >= 1 && b.act <= waves && b.t > 0.4 + (b.act - 1) * 0.45) {
+          for (let k = 0; k < 5; k++) {
+            const sh = this.spawnShot('foe', 'orb', cx, cy + 0.3, b.dir, 0, 'boss', { color: 0x99ff44, ov: { beh: 'arc', r: 0.28, life: 3 } });
+            sh.vx = b.dir * (2 + k * 1.8 + (b.act % 2) * 0.9);
+            sh.vy = 9 + Math.random() * 2;
+          }
+          play('shot');
+          b.act++;
+        }
+        if (b.t > 0.6 + waves * 0.45 + 0.8) done();
+        break;
+      }
+      default:
+        done();
+    }
+  }
+
+  // ボスごとの外見バリエーション（装飾パーツ）
+  decorateBoss(b) {
+    const g = geo();
+    const id = b.def.id;
+    const col = this.bossCol(b);
+    const H = b.def.height;
+    const grp = new THREE.Group();
+    const em = c => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.9, metalness: 0.5, roughness: 0.3 });
+    const add = (geom, mat, pos, scl, rot) => {
+      const m = new THREE.Mesh(geom, mat);
+      m.position.set(...pos);
+      m.scale.set(...scl);
+      if (rot) m.rotation.set(...rot);
+      m.userData.own = true;
+      grp.add(m);
+      this.disposables.push(mat);
+      return m;
+    };
+    const STY = {
+      volca: 'horns', frost: 'crystal', storm: 'wings', spark: 'coils', quake: 'pads', boomer: 'gear',
+      laser: 'halo', scorpio: 'tail', vile: 'horns', shadow: 'wings', void: 'halo', crimsonx: 'horns',
+      trinity: 'crown', guardian: 'pads',
+    };
+    const st = STY[id];
+    if (!st) return;
+    if (st === 'horns') {
+      for (const s of [-1, 1]) add(g.cone, em(col), [s * H * 0.12, H * 0.98, 0], [H * 0.08, H * 0.25, H * 0.08], [0, 0, -s * 0.5]);
+    } else if (st === 'crystal') {
+      for (let k = 0; k < 5; k++) add(g.oct, em(0xbbf4ff), [(k - 2) * H * 0.08, H * 0.95 + Math.abs(k - 2) * -0.05, -H * 0.05], [H * 0.04, H * 0.12, H * 0.04]);
+      for (const s of [-1, 1]) add(g.oct, em(0x88ddff), [s * H * 0.24, H * 0.72, 0], [H * 0.06, H * 0.14, H * 0.06]);
+    } else if (st === 'wings') {
+      for (const s of [-1, 1]) {
+        const w = add(g.cone, em(col), [0, H * 0.7, -H * 0.15], [H * 0.1, H * 0.5, H * 0.04], [0, 0, s * 1.1]);
+        w.userData.flap = s;
+      }
+    } else if (st === 'coils') {
+      for (const s of [-1, 1]) {
+        for (let k = 0; k < 3; k++) add(g.torus, em(0xffe033), [s * H * 0.22, H * (0.62 + k * 0.08), 0], [H * 0.09, H * 0.09, H * 0.09], [Math.PI / 2, 0, 0]);
+      }
+    } else if (st === 'pads') {
+      for (const s of [-1, 1]) add(g.box, em(col), [s * H * 0.24, H * 0.74, 0], [H * 0.18, H * 0.12, H * 0.22]);
+      add(g.box, em(0x333333), [0, H * 0.4, H * 0.15], [H * 0.3, H * 0.1, H * 0.05]);
+    } else if (st === 'gear') {
+      const gr = add(g.torus, em(col), [0, H * 0.62, -H * 0.18], [H * 0.3, H * 0.3, H * 0.3]);
+      gr.userData.spin = 3;
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2;
+        const t = new THREE.Mesh(g.box, gr.material);
+        t.position.set(Math.cos(a) * 0.85, Math.sin(a) * 0.85, 0);
+        t.scale.set(0.22, 0.22, 0.2);
+        t.rotation.z = a;
+        t.userData.own = true;
+        gr.add(t);
+      }
+    } else if (st === 'halo') {
+      const h = add(g.torus, em(col), [0, H * 1.08, 0], [H * 0.18, H * 0.18, H * 0.18], [Math.PI / 2, 0, 0]);
+      h.userData.spin = 2;
+      for (let k = 0; k < 3; k++) {
+        const o = add(g.oct, em(0xffffff), [0, H * 0.6, 0], [H * 0.05, H * 0.08, H * 0.05]);
+        o.userData.orbit = k;
+      }
+    } else if (st === 'tail') {
+      for (let k = 0; k < 5; k++) add(g.sphere, em(k === 4 ? 0x99ff44 : col), [0, H * (0.3 + k * 0.14), -H * (0.2 + Math.sin(k * 0.6) * 0.15)], [H * 0.07, H * 0.07, H * 0.07]);
+      add(g.cone, em(0x99ff44), [0, H * 1.0, -H * 0.12], [H * 0.06, H * 0.14, H * 0.06], [0.8, 0, 0]);
+    } else if (st === 'crown') {
+      for (let k = 0; k < 3; k++) {
+        const a = (k - 1) * 0.6;
+        add(g.cone, em([0xff2266, 0xffaa00, 0x66ccff][k]), [Math.sin(a) * H * 0.2, H * 1.0, 0], [H * 0.07, H * 0.2, H * 0.07], [0, 0, -a]);
+      }
+    }
+    b.rig.group.add(grp);
+    b.deco = grp;
+  }
+
+  animateDeco(b, dt) {
+    if (!b.deco) return;
+    const H = b.def.height;
+    for (const m of b.deco.children) {
+      if (m.userData.spin) m.rotation.z += dt * m.userData.spin;
+      if (m.userData.flap) m.rotation.z = m.userData.flap * (1.1 + Math.sin(b.t * 8) * 0.25);
+      if (m.userData.orbit !== undefined) {
+        const a = b.t * 2.5 + (m.userData.orbit / 3) * Math.PI * 2;
+        m.position.set(Math.cos(a) * H * 0.45, H * 0.6 + Math.sin(a * 2) * 0.2, Math.sin(a) * H * 0.45);
+      }
+    }
+  }
+
   updateBoss(b, dt) {
     const p = this.player;
     b.t += dt;
@@ -1844,14 +2882,22 @@ export class Game {
           b.vx = 0;
           b.dir = p.x < b.x ? -1 : 1;
           if (b.t > (fury ? 0.45 : 0.85)) {
-            const r = Math.random();
-            b.state = r < 0.38 ? 'shoot' : r < 0.62 ? 'leap' : r < 0.82 ? 'dash' : 'rain';
+            b.state = this.pickBossState(b, fury);
+            b.lastState = b.state;
             b.t = 0;
             b.act = 0;
             b.wi = (b.wi + 1) % b.weapons.length;
           }
           break;
         }
+        case 'barrage':
+        case 'spiral':
+        case 'slam':
+        case 'teleport':
+        case 'summon':
+        case 'sig':
+          this.bossPattern(b, dt, fury);
+          break;
         case 'shoot': {
           const times = fury ? [0.2, 0.45, 0.7, 0.95] : [0.25, 0.6, 0.95];
           if (b.act < times.length && b.t > times[b.act]) {
@@ -1933,7 +2979,7 @@ export class Game {
       b.y = (rm ? rm.y : this.groundAt(p.x)) + 4;
       b.vy = 0;
     }
-    if (b.state !== 'intro' && !p.dead && this.overlap(p, { x0: b.x - b.w / 2, x1: b.x + b.w / 2, y0: b.y, y1: b.y + b.h })) {
+    if (b.state !== 'intro' && !(b.state === 'teleport' && b.act === 1) && !p.dead && this.overlap(p, { x0: b.x - b.w / 2, x1: b.x + b.w / 2, y0: b.y, y1: b.y + b.h })) {
       this.hurtPlayer(4, 'boss');
     }
   }
@@ -2074,7 +3120,12 @@ export class Game {
     for (const b of this.bosses) {
       const anim = b.state === 'intro' ? (b.onGround ? 'idle' : 'jump') : !b.onGround ? 'jump' : b.state === 'dash' && b.t > 0.4 ? 'run' : b.state === 'shoot' ? 'shoot' : Math.abs(b.vx) > 0.2 ? 'run' : 'idle';
       this.poseRig(b.rig, b, dt, anim);
-      b.rig.group.visible = b.flash <= 0 || Math.floor(this.time * 30) % 2 === 0;
+      this.animateDeco(b, dt);
+      if (b.state !== 'spiral') {
+        b.rig.group.rotation.y = 0;
+      }
+      const hiding = b.state === 'teleport' && b.act === 1;
+      b.rig.group.visible = !hiding && (b.flash <= 0 || Math.floor(this.time * 30) % 2 === 0);
       if (b.dying) {
         b.rig.group.position.x += (Math.random() - 0.5) * 0.15;
       }
@@ -2145,8 +3196,16 @@ export class Game {
     const ty = p.dead ? this.camY : p.y + 1.8;
     this.camX += (tx - this.camX) * Math.min(1, dt * 6);
     this.camY += (ty - this.camY) * Math.min(1, dt * 4);
-    this.camera.position.set(this.camX, this.camY + 1.4, this.camDist);
-    this.camera.lookAt(this.camX, this.camY, 0);
+    let sx = 0;
+    let sy = 0;
+    if (this.shakeT > 0) {
+      this.shakeT -= dt;
+      const a = Math.min(0.35, this.shakeT) * 1.2;
+      sx = (Math.random() - 0.5) * a;
+      sy = (Math.random() - 0.5) * a;
+    }
+    this.camera.position.set(this.camX + sx, this.camY + 1.4 + sy, this.camDist);
+    this.camera.lookAt(this.camX + sx, this.camY + sy, 0);
     this.bg.position.x = this.camX * 0.85;
     this.bg.position.y = 14 + this.camY * 0.5;
     this.accentLight.position.set(p.x, p.y + 3, 4);

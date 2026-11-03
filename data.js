@@ -19,14 +19,14 @@ export const HEROES = [
 ];
 
 export const BOSSES = [
-  { id: 'volca', name: 'イグニス・フォージ', area: '灼熱精錬プラント', weapon: 'fire', color: 0xff5522, bg: 'city', fog: 0x2a0d06, enemies: ['walker', 'turret', 'hopper'], hiddenIdx: null },
-  { id: 'frost', name: 'グレイシア・ベル', area: '極北氷結ベース', weapon: 'ice', color: 0x88ddff, bg: 'city', fog: 0x0a1c2c, enemies: ['walker', 'drone', 'shielder'], hiddenIdx: 0 },
-  { id: 'storm', name: 'テンペスト・ヴェイン', area: '天空風力塔', weapon: 'homing', color: 0x55ffaa, bg: 'city', fog: 0x082218, enemies: ['drone', 'drone', 'turret'], hiddenIdx: null },
-  { id: 'spark', name: 'ヴォルテクス・コイル', area: '発電タワー', weapon: 'spark', color: 0xffe033, bg: 'fortress', fog: 0x221d05, enemies: ['hopper', 'turret', 'drone'], hiddenIdx: null },
-  { id: 'quake', name: 'テラ・ハンマー', area: '地下採掘場', weapon: 'quake', color: 0xb07a44, bg: 'fortress', fog: 0x1e1208, enemies: ['shielder', 'walker', 'hopper'], hiddenIdx: 1 },
-  { id: 'boomer', name: 'スピン・ギアード', area: '歯車工場', weapon: 'boomerang', color: 0xff9900, bg: 'city', fog: 0x24120a, enemies: ['walker', 'hopper', 'drone'], hiddenIdx: null },
-  { id: 'laser', name: 'プリズマ・レンズ', area: '水晶研究所', weapon: 'laser', color: 0xff44cc, bg: 'fortress', fog: 0x1c0820, enemies: ['turret', 'drone', 'shielder'], hiddenIdx: 2 },
-  { id: 'scorpio', name: 'ミアズマ・フラスコ', area: '化学プラント', weapon: 'spread', color: 0x9955ff, bg: 'fortress', fog: 0x160a24, enemies: ['shielder', 'turret', 'walker'], hiddenIdx: null },
+  { id: 'volca', name: 'イグニス・フォージ', area: '灼熱精錬プラント', weapon: 'fire', color: 0xff5522, bg: 'city', fog: 0x2a0d06, enemies: ['walker', 'turret', 'hopper', 'mortar', 'heavy', 'mine'], hiddenIdx: null },
+  { id: 'frost', name: 'グレイシア・ベル', area: '極北氷結ベース', weapon: 'ice', color: 0x88ddff, bg: 'city', fog: 0x0a1c2c, enemies: ['walker', 'drone', 'shielder', 'roller', 'sniper', 'bat'], hiddenIdx: 0 },
+  { id: 'storm', name: 'テンペスト・ヴェイン', area: '天空風力塔', weapon: 'homing', color: 0x55ffaa, bg: 'city', fog: 0x082218, enemies: ['drone', 'bomber', 'turret', 'bat', 'orbiter', 'walker'], hiddenIdx: null },
+  { id: 'spark', name: 'ヴォルテクス・コイル', area: '発電タワー', weapon: 'spark', color: 0xffe033, bg: 'fortress', fog: 0x221d05, enemies: ['hopper', 'turret', 'drone', 'orbiter', 'mine', 'sniper'], hiddenIdx: null },
+  { id: 'quake', name: 'テラ・ハンマー', area: '地下採掘場', weapon: 'quake', color: 0xb07a44, bg: 'fortress', fog: 0x1e1208, enemies: ['shielder', 'walker', 'hopper', 'heavy', 'roller', 'mortar'], hiddenIdx: 1 },
+  { id: 'boomer', name: 'スピン・ギアード', area: '歯車工場', weapon: 'boomerang', color: 0xff9900, bg: 'city', fog: 0x24120a, enemies: ['walker', 'hopper', 'drone', 'roller', 'splitter', 'bomber'], hiddenIdx: null },
+  { id: 'laser', name: 'プリズマ・レンズ', area: '水晶研究所', weapon: 'laser', color: 0xff44cc, bg: 'fortress', fog: 0x1c0820, enemies: ['turret', 'drone', 'shielder', 'sniper', 'orbiter', 'splitter'], hiddenIdx: 2 },
+  { id: 'scorpio', name: 'ミアズマ・フラスコ', area: '化学プラント', weapon: 'spread', color: 0x9955ff, bg: 'fortress', fog: 0x160a24, enemies: ['shielder', 'turret', 'walker', 'splitter', 'mine', 'bat'], hiddenIdx: null },
 ];
 
 export const HIDDEN = [
@@ -86,7 +86,7 @@ export const STAGES = BOSSES.map((_, i) => makeBossStage(i));
 
 export const INTRO_STAGE = {
   id: 'intro', name: 'オープニング：中央ハイウェイ', seed: 7, length: 110, bg: 'city', fog: 0x0c1430, accent: 0x44ccff,
-  enemies: ['walker', 'drone', 'hopper'], density: 1, bosses: [INTRO_BOSS], tutorial: true,
+  enemies: ['walker', 'drone', 'hopper', 'roller', 'bat'], density: 1, bosses: [INTRO_BOSS], tutorial: true,
   tips: [
     { x: 2, text: '← → / A D で移動　Space / K でジャンプ' },
     { x: 18, text: 'J / Z / クリックでショット　長押しでチャージ！' },
@@ -97,10 +97,10 @@ export const INTRO_STAGE = {
 };
 
 export const FINAL_STAGES = [
-  { id: 'f1', name: 'ファイナル1：融合の門', seed: 5001, length: 140, bg: 'fortress', fog: 0x1a0820, accent: 0xff2266, enemies: ['walker', 'drone', 'shielder', 'turret'], density: 3, bosses: [FUSED] },
-  { id: 'f2', name: 'ファイナル2：鋼鉄回廊', seed: 5002, length: 150, bg: 'fortress', fog: 0x201804, accent: 0xffcc44, enemies: ['hopper', 'shielder', 'turret', 'drone'], density: 3, bosses: [GUARDIAN] },
-  { id: 'f3', name: 'ファイナル3：再生ボスラッシュ', seed: 5003, length: 60, bg: 'fortress', fog: 0x10101c, accent: 0x9b7bff, enemies: ['drone'], density: 1, bosses: BOSSES.map((b, i) => bossDef(b, i, 18)) },
-  { id: 'f4', name: 'ファイナル4：玉座', seed: 5004, length: 70, bg: 'fortress', fog: 0x200410, accent: 0xff3333, enemies: ['turret', 'drone'], density: 1, bosses: [OVERLORD] },
+  { id: 'f1', name: 'ファイナル1：融合の門', seed: 5001, length: 140, bg: 'fortress', fog: 0x1a0820, accent: 0xff2266, enemies: ['walker', 'drone', 'shielder', 'turret', 'splitter', 'orbiter', 'sniper', 'bat'], density: 3, bosses: [FUSED] },
+  { id: 'f2', name: 'ファイナル2：鋼鉄回廊', seed: 5002, length: 150, bg: 'fortress', fog: 0x201804, accent: 0xffcc44, enemies: ['hopper', 'shielder', 'turret', 'drone', 'heavy', 'mortar', 'mine', 'bomber'], density: 3, bosses: [GUARDIAN] },
+  { id: 'f3', name: 'ファイナル3：再生ボスラッシュ', seed: 5003, length: 60, bg: 'fortress', fog: 0x10101c, accent: 0x9b7bff, enemies: ['drone', 'bat', 'orbiter'], density: 1, bosses: BOSSES.map((b, i) => bossDef(b, i, 18)) },
+  { id: 'f4', name: 'ファイナル4：玉座', seed: 5004, length: 70, bg: 'fortress', fog: 0x200410, accent: 0xff3333, enemies: ['turret', 'drone', 'heavy', 'sniper', 'orbiter'], density: 1, bosses: [OVERLORD] },
 ];
 
 export const ARENA_STAGE = { id: 'arena', name: 'バトルアリーナ', arena: true, seed: 42, length: 40, bg: 'fortress', fog: 0x120a1e, accent: 0x44ffee, enemies: [], density: 0, bosses: [] };
