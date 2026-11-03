@@ -1411,7 +1411,7 @@ export class Game {
         sh.vx = dir * 7; sh.vy = 5; sh.dmg = level ? 4 : 2; sh.r = level ? 0.6 : 0.35; sh.beh = 'bounce'; sh.life = 2.6; sh.walls = false; break;
       case 'spikebomb':
         // トゲトゲボム：放物線で放ち、地面で数回バウンドしてから爆発
-        sh.vx = dir * (level ? 8 : 6.5); sh.vy = level ? 7 : 6; sh.dmg = level ? 5 : 3; sh.r = level ? 0.6 : 0.45;
+        sh.vx = dir * (level ? 8 : 6.5); sh.vy = level ? 7 : 6; sh.dmg = level ? 4 : 2; sh.r = level ? 0.6 : 0.45;
         sh.beh = 'spikebounce'; sh.bounces = level ? 4 : 3; sh.life = 3.2; sh.walls = false; sh.pierce = !!level; vis = 'spikeball'; break;
       case 'quake':
         sh.y = this.groundAt(x, y + 0.5); setV(10); sh.vy = 0; sh.dmg = level ? 5 : 3; sh.r = 0.8; sh.pierce = true; sh.walls = true; sh.life = 1.2; vis = 'pillar'; sh.beh = 'quake'; break;
@@ -1671,7 +1671,7 @@ export class Game {
   // トゲトゲボムの爆発（味方側の固定ダメージ爆風＋トゲ破片）
   spikeBlast(sh) {
     const r = sh.r > 0.5 ? 1.8 : 1.4;
-    const b = this.spawnShot(sh.team, 'orb', sh.x, sh.y, 1, 0, sh.owner, { speed: 0, color: sh.color, ov: { r, life: 0.18, pierce: true, walls: false, dmg: sh.r > 0.5 ? 4 : 3, fixed: true } });
+    const b = this.spawnShot(sh.team, 'orb', sh.x, sh.y, 1, 0, sh.owner, { speed: 0, color: sh.color, ov: { r, life: 0.18, pierce: true, walls: false, dmg: sh.r > 0.5 ? 3 : 2, fixed: true } });
     b.mesh.visible = false;
     this.particles.emit(sh.x, sh.y, sh.color, 16, { ring: true, speed: 7, life: 0.35, size: 0.7 });
     this.particles.emit(sh.x, sh.y, 0xffee99, 10, { speed: 4, life: 0.45, size: 0.8 });
@@ -3498,6 +3498,12 @@ export class Game {
         sh.follow = n.ghosts[e.from];
       }
     }));
+    n.hpOf = {};
+    n.unsubs.push(room.on('hp', e => {
+      if (e && e.from && typeof e.hp === 'number' && (!e.stage || !this.stage || e.stage === this.stage.id)) {
+        n.hpOf[e.from] = { hp: e.hp, max: e.max || 1, name: e.name, t: performance.now() };
+      }
+    }));
     n.unsubs.push(room.on('ko', e => this.onKO(e)));
     n.unsubs.push(room.on('clear', () => {
       if (this.running && this.mode === 'coop' && this.clearT < 0) {
@@ -3531,6 +3537,7 @@ export class Game {
       }
     });
     Object.values(this.net.ghosts).forEach(g => this.world && this.world.remove(g.rig.group));
+    this.drawRivalHP(null);
     try {
       this.net.room.presence({ inGame: false });
     } catch (e) {
@@ -3571,6 +3578,31 @@ export class Game {
       this.net.only = '__none__';
       this.net.quiet = true;
     }
+  }
+
+  // 対戦相手（侵入者／ターゲット）のHPパネル（ボスバーとは独立したDOM）
+  drawRivalHP(r, label = '') {
+    let el = document.getElementById('rivalhp');
+    if (!r) {
+      if (el) el.style.display = 'none';
+      return;
+    }
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'rivalhp';
+      el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 10px);z-index:30;pointer-events:none;'
+        + 'min-width:220px;width:42vw;max-width:420px;padding:5px 10px 7px;background:rgba(20,6,10,.78);border:2px solid #ff4a5a;border-radius:6px;'
+        + 'box-shadow:0 0 12px rgba(255,60,80,.5);font:13px "DotGothic16",sans-serif;color:#ffe8ea;text-shadow:1px 1px 0 #000;';
+      el.innerHTML = '<div class="rn" style="display:flex;justify-content:space-between;margin-bottom:3px"><span class="rl"></span><span class="rv"></span></div>'
+        + '<div style="height:10px;background:#2a0a10;border:1px solid #000"><i style="display:block;height:100%;width:100%;background:linear-gradient(#ff8a96,#d0182c);transition:width .15s"></i></div>';
+      (document.getElementById('game-container') || document.body).appendChild(el);
+    }
+    el.style.display = 'block';
+    const max = Math.max(1, r.max || 1);
+    const hp = Math.max(0, Math.min(max, r.hp));
+    el.querySelector('.rl').textContent = `${label} ${r.name || ''}`;
+    el.querySelector('.rv').textContent = `HP ${hp}/${max}`;
+    el.querySelector('i').style.width = `${(hp / max) * 100}%`;
   }
 
   updateNet(dt) {
@@ -3635,20 +3667,25 @@ export class Game {
         delete n.ghosts[pid];
       }
     }
-    // 侵入者「宇邇宮」のHPバー：侵入者・被侵入者の両方に同じ値を表示
-    if (this.mode === 'invader') {
-      const hv = Math.max(0, Math.round(p.hp));
-      this.ui.setBoss(hv, p.max, `${p.kit.name}（あなた） ${hv}/${p.max}`);
-    } else if (!this.bosses.length) {
-      const inv = n.only && n.only !== '__none__' && n.ghosts[n.only] ? peers[n.only] : null;
-      if (inv && typeof inv.hp === 'number') {
-        this.ui.setBoss(inv.hp, inv.max || 60, `侵入者 ${inv.name || '宇邇宮'} ${inv.hp}/${inv.max || 60}`);
-        n.invBar = true;
-      } else if (n.invBar) {
-        this.ui.setBoss(0, 1, null);
-        n.invBar = false;
+    // 侵入戦のHP共有：専用トピックで送信（変化時＋0.5秒ごと）し、相手のHPを専用パネルに表示
+    const hv = Math.max(0, Math.round(p.hp));
+    n.hpT = (n.hpT || 0) - dt;
+    if (n.only && n.only !== '__none__' && (hv !== n.lastHp || n.hpT <= 0)) {
+      n.lastHp = hv;
+      n.hpT = 0.5;
+      n.room.emit('hp', { hp: hv, max: p.max, name: p.kit.name, stage: this.stage.id });
+    }
+    let rival = null;
+    if (n.only && n.only !== '__none__') {
+      const ev = n.hpOf && n.hpOf[n.only];
+      const pr = peers[n.only];
+      if (ev && performance.now() - ev.t < 4000) {
+        rival = ev;
+      } else if (pr && typeof pr.hp === 'number' && pr.stage === this.stage.id) {
+        rival = { hp: pr.hp, max: pr.max, name: pr.name };
       }
     }
+    this.drawRivalHP(rival, this.mode === 'invader' ? 'ターゲット' : '侵入者');
     if (this.mode === 'invader') {
       const tg = n.ghosts[n.only];
       if (tg && !n.targetSeen) {

@@ -1,14 +1,19 @@
 {
   "name": "VOLT BREAKERS｜ヴォルト・ブレイカーズ",
   "short_name": "VOLT BREAKERS",
-  "description": "ブラウザで遊べる3D横スクロールアクションゲーム。8体のボス、特殊武器、オンライン協力・対戦。",
+  "description": "ブラウザで今すぐ無料で遊べる3D横スクロールアクションゲーム。8体のボス、特殊武器、オンライン協力・対戦対応。",
   "lang": "ja",
   "start_url": "./",
+  "scope": "./",
   "display": "fullscreen",
   "orientation": "landscape",
   "background_color": "#05070f",
   "theme_color": "#0a1430",
+  "categories": ["games", "entertainment"],
   "icons": [
     { "src": "assets/vb-favicon.webp", "sizes": "951x952", "type": "image/webp", "purpose": "any" }
+  ],
+  "screenshots": [
+    { "src": "assets/vb-preview.webp", "sizes": "1536x864", "type": "image/webp", "form_factor": "wide", "label": "VOLT BREAKERS キービジュアル" }
   ]
 }

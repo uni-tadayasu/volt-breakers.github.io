@@ -120,7 +120,7 @@ export function bossKit(def) {
 // 運営者専用キャラ：重装破城機「宇邇宮」（トゲ鉄球を操る巨漢ロボ）
 export const OVERLORD_KIT = {
   id: 'operator', name: '宇邇宮', model: 'vb-operator-brute', height: 2.1, weapon: 'spikebomb',
-  color: 0xd8202a, hp: 60, portrait: 'assets/vb-p-operator.webp', flail: true, desc: 'トゲ鉄球と鉄拳の重装破城機（運営専用）',
+  color: 0xd8202a, hp: 44, portrait: 'assets/vb-p-operator.webp', flail: true, desc: 'トゲ鉄球と鉄拳の重装破城機（運営専用）',
 };
 
 export function versusRoster(isOperator) {

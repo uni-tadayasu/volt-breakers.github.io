@@ -72,22 +72,78 @@
     <meta name="twitter:title" content="VOLT BREAKERS｜ヴォルト・ブレイカーズ" />
     <meta name="twitter:description" content="ブラウザで今すぐ遊べる3D横スクロールアクション。8体のボス、特殊武器、オンライン協力・対戦。" />
     <meta name="twitter:image" content="assets/vb-preview.webp" />
+    <meta name="twitter:image:alt" content="VOLT BREAKERS キービジュアル：ネオン都市で戦うヴァンとレイ" />
+    <meta property="og:image:type" content="image/webp" />
+    <meta property="og:url" content="" />
+    <link rel="canonical" href="" />
+    <link rel="alternate" hreflang="ja" href="" />
+    <link rel="alternate" hreflang="x-default" href="" />
+    <script>
+      // 公開URLから canonical / og:url / hreflang / 画像URLを絶対URLで自動設定（ドメイン変更にも追従）
+      (function () {
+        try {
+          const url = location.origin + location.pathname.replace(/index\.html$/, '');
+          const abs = p => new URL(p, url).href;
+          document.querySelector('link[rel=canonical]').href = url;
+          document.querySelectorAll('link[rel=alternate][hreflang]').forEach(l => (l.href = url));
+          document.querySelector('meta[property="og:url"]').content = url;
+          ['meta[property="og:image"]', 'meta[name="twitter:image"]'].forEach(s => {
+            const m = document.querySelector(s);
+            if (m) m.content = abs(m.getAttribute('content'));
+          });
+          document.querySelectorAll('script[type="application/ld+json"]').forEach(s => {
+            s.textContent = s.textContent.replace(/"__URL__"/g, JSON.stringify(url)).replace(/"__IMG__"/g, JSON.stringify(abs('assets/vb-preview.webp')));
+          });
+        } catch (e) {}
+      })();
+    </script>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "VideoGame",
-        "name": "VOLT BREAKERS｜ヴォルト・ブレイカーズ",
-        "alternateName": ["VOLT BREAKERS", "ヴォルト・ブレイカーズ"],
-        "description": "暴走した自律機兵に支配された機械都市ネオ・ヴォルタを舞台に、特殊鎮圧部隊ブレイカーズの一員として8体の守護機と首謀者に挑む3D横スクロールアクションゲーム。",
-        "genre": ["Action", "Platformer", "横スクロールアクション"],
-        "inLanguage": "ja",
-        "image": "assets/vb-preview.webp",
-        "applicationCategory": "Game",
-        "operatingSystem": "Web Browser (PC / iOS / Android)",
-        "gamePlatform": ["Web Browser", "PC", "Smartphone"],
-        "playMode": ["SinglePlayer", "MultiPlayer", "CoOp"],
-        "numberOfPlayers": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 4 },
-        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" }
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "name": "VOLT BREAKERS｜ヴォルト・ブレイカーズ",
+            "alternateName": ["VOLT BREAKERS", "ヴォルト・ブレイカーズ", "ボルトブレイカーズ"],
+            "url": "__URL__",
+            "inLanguage": "ja"
+          },
+          {
+            "@type": ["VideoGame", "WebApplication"],
+            "name": "VOLT BREAKERS｜ヴォルト・ブレイカーズ",
+            "alternateName": ["VOLT BREAKERS", "ヴォルト・ブレイカーズ"],
+            "url": "__URL__",
+            "description": "暴走した自律機兵に支配された機械都市ネオ・ヴォルタを舞台に、特殊鎮圧部隊ブレイカーズの一員として8体の守護機と首謀者に挑む3D横スクロールアクションゲーム。",
+            "genre": ["Action", "Platformer", "横スクロールアクション"],
+            "keywords": "横スクロールアクション, 3Dアクション, ブラウザゲーム, 無料ゲーム, オンライン協力, オンライン対戦, スマホゲーム, ボスバトル",
+            "inLanguage": "ja",
+            "image": "__IMG__",
+            "screenshot": "__IMG__",
+            "applicationCategory": "GameApplication",
+            "applicationSubCategory": "ActionGame",
+            "operatingSystem": "Web Browser (PC / iOS / Android)",
+            "browserRequirements": "WebGL・JavaScriptに対応したモダンブラウザ",
+            "gamePlatform": ["Web Browser", "PC", "Smartphone"],
+            "playMode": ["SinglePlayer", "MultiPlayer", "CoOp"],
+            "numberOfPlayers": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 4 },
+            "character": [
+              { "@type": "Person", "name": "ヴァン" },
+              { "@type": "Person", "name": "レイ" }
+            ],
+            "author": { "@type": "Organization", "name": "VOLT BREAKERS Project" },
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY", "availability": "https://schema.org/InStock" }
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              { "@type": "Question", "name": "VOLT BREAKERSは無料で遊べますか？", "acceptedAnswer": { "@type": "Answer", "text": "はい。インストール不要で、ブラウザから無料で遊べます。" } },
+              { "@type": "Question", "name": "スマホでも遊べますか？", "acceptedAnswer": { "@type": "Answer", "text": "iPhone・Androidのブラウザでタッチ操作に対応しています。PCではキーボードとゲームパッドが使えます。" } },
+              { "@type": "Question", "name": "続きから遊ぶには？", "acceptedAnswer": { "@type": "Answer", "text": "進行状況は自動保存されるほか、6文字のパスワードで別の端末からも続きを遊べます。" } },
+              { "@type": "Question", "name": "友達と一緒に遊べますか？", "acceptedAnswer": { "@type": "Answer", "text": "オンラインで2人協力プレイ、2人または4人の対戦プレイができます。" } }
+            ]
+          }
+        ]
       }
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -280,7 +336,30 @@
       </section>
       <section>
         <h2>操作方法</h2>
-        <p>移動：←→/AD、ジャンプ：Space/K、ダッシュ：Shift/L、ショット：J/Z、特殊武器：X/I、武器切替：Q/E、回復セル：T、ポーズ：Esc/P。</p>
+        <p>移動：←→/AD、ジャンプ：Space/K、ダッシュ：Shift/L、ショット：J/Z（長押しでチャージ）、特殊武器：X/I、武器切替：Q/E、回復セル：T、ポーズ：Esc/P。</p>
+        <p>ゲームパッド：Aでジャンプ、Xでショット、B/LTでダッシュ、RTで特殊武器、LB/RBで武器切替、Yで回復セル。スマホ：画面のボタンで操作（SPで特殊武器）。</p>
+      </section>
+      <section>
+        <h2>キャラクター</h2>
+        <ul>
+          <li>ヴァン：3段階チャージのアーク・ブラスターで戦う射撃型。</li>
+          <li>レイ：3連撃と衝撃波を放つフォトン・ブレードの近接型。</li>
+        </ul>
+      </section>
+      <section>
+        <h2>特殊武器</h2>
+        <p>フォージ・フレア、グレイシャル・ニードル、ゲイル・ドローン、コイル・ボール、テラ・ウェイブ、ギア・リング、プリズム・ビーム、ミアズマ・スプレー。ボスを倒すと武器を入手でき、各ボスには弱点となる武器があります。</p>
+      </section>
+      <section>
+        <h2>よくある質問</h2>
+        <h3>無料で遊べますか？</h3>
+        <p>はい。インストール不要で、ブラウザから無料で遊べます。</p>
+        <h3>スマホでも遊べますか？</h3>
+        <p>iPhone・Androidのブラウザでタッチ操作に対応しています。PCではキーボードとゲームパッドが使えます。</p>
+        <h3>続きから遊ぶには？</h3>
+        <p>進行状況は自動保存されるほか、6文字のパスワードで別の端末からも続きを遊べます。</p>
+        <h3>友達と一緒に遊べますか？</h3>
+        <p>オンラインで2人協力プレイ、2人または4人の対戦プレイができます。</p>
       </section>
     </main>
     <noscript><p style="color:#fff;padding:20px">VOLT BREAKERS｜ヴォルト・ブレイカーズ を遊ぶにはJavaScriptを有効にしてください。</p></noscript>
