@@ -158,7 +158,7 @@ function menu() {
       ${btn('new', 'ニューゲーム')}
       ${save.intro ? btn('cont', 'コンティニュー') : ''}
       ${btn('pass', 'パスワード')}
-      ${btn('offline', 'オフライン対戦')}
+      ${btn('offline', 'オフライン')}
       ${btn('online', 'オンライン')}
       ${btn('opt', 'オプション')}
       ${canInvade() ? btn('invade', save.operator ? '⚠ 侵入（運営）' : '⚠ 侵入（スタッフ）') : ''}
@@ -650,7 +650,7 @@ function offlineMenu() {
     rollComs();
   }
   const coms = offline.comKits.map((id, i) => `<div>COM${i + 1}：${esc(findKit(id).name)}</div>`).join('');
-  show(`<h2>オフライン対戦</h2>
+  show(`<h2>オフライン</h2>
     <div class="panel col">
       <div class="row">人数 ${[1, 2, 3].map(n => `<button class="btn small ${offline.coms === n ? 'sel' : ''}" data-act="n:${n}">${n + 1}人</button>`).join('')}</div>
       <div class="row">COMの強さ ${Object.entries(OFF_DIFF).map(([k, l]) => `<button class="btn small ${offline.diff === k ? 'sel' : ''}" data-act="d:${k}">${l}</button>`).join('')}</div>

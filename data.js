@@ -12,6 +12,9 @@ export const WEAPONS = {
   laser: { name: 'プリズム・ビーム', color: 0xff5ad8 },
   spread: { name: 'ミアズマ・スプレー', color: 0xb070ff },
   spikebomb: { name: 'スパイク・ボム', color: 0xff3a2a },
+  cutter: { name: 'ルナ・カッター', color: 0x5ff0ff },
+  mine: { name: 'ガルヴァ・マイン', color: 0xff6a3a },
+  spinray: { name: 'ローリング・レイ', color: 0x66ff88 },
 };
 
 export const HEROES = [
@@ -126,14 +129,15 @@ export const OVERLORD_KIT = {
 // スタッフ用侵入キャラ（オリジナルデザイン）
 export const STAFF_KITS = [
   {
-    id: 'hornet', name: 'ヴェスパ', model: 'vb-staff-hornet', height: 1.85, weapon: 'saber',
-    color: 0x2a3a9a, hp: 36, portrait: 'assets/vb-p-hornet.webp', desc: '三日月兜の光刃剣客。疾風の連撃',
-    weapons: ['saber', 'homing', 'ice', 'boomerang'],
+    // 溜め斬りは上段斬り上げ→巨大な「ルナ・カッター」
+    id: 'hornet', name: 'ヴェスパ', model: 'vb-staff-hornet2', height: 1.85, weapon: 'saber', cutter: true,
+    color: 0x2a3a9a, hp: 36, portrait: 'assets/vb-p-hornet.webp', desc: '三日月兜の光刃剣客。斬り上げで巨大カッター',
+    weapons: ['saber', 'cutter', 'homing', 'ice'],
   },
   {
-    id: 'sage', name: 'ドク・ガルヴァ', model: 'vb-operator-brute', height: 1.9, weapon: 'spark',
-    tint: 0xf2ece0, emissive: 0x2aff66, color: 0xff8a2a, hp: 40, portrait: 'assets/vb-p-sage.webp', desc: '片眼鏡の老発明家。掌の放電砲',
-    weapons: ['spark', 'laser', 'quake', 'spread'],
+    id: 'sage', name: 'ドク・ガルヴァ', model: 'vb-staff-sage', height: 1.8, weapon: 'spark',
+    color: 0xff8a2a, hp: 40, portrait: 'assets/vb-p-sage.webp', desc: '片眼鏡の老発明家。地雷と回転光線',
+    weapons: ['spark', 'mine', 'spinray', 'laser'],
   },
 ];
 export const OPERATOR_WEAPONS = ['spikebomb', 'boomerang', 'quake', 'spark', 'fire'];

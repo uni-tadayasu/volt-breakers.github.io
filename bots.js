@@ -116,8 +116,57 @@ export class LocalRoom {
     return best;
   }
 
+  // 固有技（ルナ・カッター／地雷／ローリング・レイ）を時々使う
+  special(b, t, game) {
+    const w = b.kit.weapons || [];
+    const dx = Math.abs(t.x - b.x);
+    const x = b.x + b.dir * 0.6;
+    const y = b.y + b.h * 0.55;
+    const sid = game.stage.id;
+    if (w.includes('cutter') && dx > 2.4) {
+      this.fire('shot', { type: 'cutter', x, y, dir: b.dir, level: 1, stage: sid, from: b.id });
+      this.shots.push({ x, y, vx: b.dir * 12, owner: b, dmg: 4, life: 1.5, r: 1.2 });
+      b.anim = 'sword';
+      b.animT = 0.3;
+      return true;
+    }
+    if (w.includes('spinray') && b.onGround && dx < 9) {
+      b.vy = 13;
+      b.spinT = 0.9;
+      b.spinTick = 0;
+      b.spinN = 0;
+      return true;
+    }
+    if (w.includes('mine') && dx < 6) {
+      this.fire('shot', { type: 'mine', x: b.x, y: b.y + 0.5, dir: b.dir, level: 0, stage: sid, from: b.id });
+      this.shots.push({ x: b.x, y: b.y + 0.4, vx: 0, owner: b, dmg: 3, life: 6, r: 0.7, arm: 0.6 });
+      return true;
+    }
+    return false;
+  }
+
+  spinTick(b, dt, game) {
+    b.spinT -= dt;
+    b.vy = Math.max(b.vy, -1.5);
+    b.spinTick -= dt;
+    if (b.spinTick <= 0) {
+      b.spinTick = 0.22;
+      b.spinN++;
+      const y = b.y + b.h * 0.55;
+      for (let k = 0; k < 6; k++) {
+        const a = b.spinN * 0.5 + (k / 6) * Math.PI * 2;
+        this.fire('shot', { type: 'ray', x: b.x, y, dir: 1, level: 0, stage: game.stage.id, from: b.id, ang: a });
+        this.shots.push({ x: b.x, y, vx: Math.cos(a) * 17, vy: Math.sin(a) * 17, owner: b, dmg: 1.5, life: 0.9, r: 0.3 });
+      }
+    }
+  }
+
   shoot(b, t, game) {
     const D = this.diff;
+    if (b.kit.weapons && Math.random() < 0.3 && this.special(b, t, game)) {
+      b.cd = D.cd * 1.6;
+      return;
+    }
     let type = SHOT_TYPES.has(b.kit.weapon) ? b.kit.weapon : 'buster';
     let level = Math.random() < D.charge ? 1 + (Math.random() < 0.4 ? 1 : 0) : 0;
     const dx = Math.abs(t.x - b.x);
@@ -182,11 +231,16 @@ export class LocalRoom {
       }
       b.vx = mv * D.speed;
       b.vy = Math.max(-20, b.vy + GRAV * dt);
+      if (b.spinT > 0) {
+        this.spinTick(b, dt, game);
+      }
       game.moveBody(b, dt);
       if (b.y < -12) {
         this.damage(b, 99, null, game);
       }
-      if (b.animT <= 0) {
+      if (b.spinT > 0) {
+        b.anim = 'spin';
+      } else if (b.animT <= 0) {
         b.anim = !b.onGround ? 'jump' : Math.abs(b.vx) > 0.2 ? 'run' : 'idle';
       } else if (!b.onGround) {
         b.anim = 'jump';
@@ -196,11 +250,16 @@ export class LocalRoom {
       const s = this.shots[i];
       s.life -= dt;
       s.x += s.vx * dt;
+      s.y += (s.vy || 0) * dt;
+      if (s.arm > 0) {
+        s.arm -= dt;
+        continue;
+      }
       let gone = s.life <= 0;
       for (const o of this.bots) {
         if (!gone && o !== s.owner && !o.dead && Math.abs(s.x - o.x) < o.w / 2 + s.r && s.y > o.y - s.r && s.y < o.y + o.h + s.r) {
           this.damage(o, s.dmg, s.owner.id, game);
-          gone = s.vx !== 0;
+          gone = s.vx !== 0 || s.arm !== undefined; // 地雷は1回で爆発
         }
       }
       if (gone) {

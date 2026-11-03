@@ -1,19 +1,20 @@
 // Core side-scrolling 3D action engine.
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { WEAPONS, findKit } from './data.js';
 import { input } from './input.js';
 import { play, playMusic, setTrack } from './audio.js';
 import { makeModel, playAnim, getTexture, ensureModel, hasModel } from './assets.js';
 
-const DEFERRED_MODELS = ['overlord', 'vb-operator-brute', 'vb-staff-hornet'];
+const DEFERRED_MODELS = ['overlord', 'vb-operator-brute', 'vb-staff-hornet2', 'vb-staff-sage'];
 // ネットワークから受け付ける弾種／モデル名のホワイトリスト
-export const SHOT_TYPES = new Set(['buster', 'slash', 'wave', 'fire', 'ice', 'homing', 'spark', 'quake', 'boomerang', 'laser', 'spread', 'spikebomb']);
+export const SHOT_TYPES = new Set(['buster', 'slash', 'wave', 'fire', 'ice', 'homing', 'spark', 'quake', 'boomerang', 'laser', 'spread', 'spikebomb', 'cutter', 'mine', 'ray']);
 const NET_MODELS = new Set(['vb-hero-van', 'vb-hero-rei', 'enemy-walker', 'boss-mech', ...DEFERRED_MODELS]);
 const num = (v, lo, hi, d) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
 import { myId } from './net.js';
 
 // オンライン同期の版番号（見た目・技の仕様を変えたら上げる）
-export const NET_VER = 20;
+export const NET_VER = 21;
 // アリーナの初期位置：人数に応じて均等に配置（障害物の柱 ±15.6〜17 を避けた座標）
 const ARENA_SLOTS = { 1: [0], 2: [-12, 12], 3: [-18, 0, 18], 4: [-18, -6, 6, 18] };
 export function arenaSpawnX(i, n) {
@@ -393,6 +394,11 @@ export class Game {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     container.appendChild(this.renderer.domElement);
     this.scene = new THREE.Scene();
+    // リアル寄りの質感：金属装甲に映り込む環境光（起動時に1回だけ低解像度で生成）
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = 0.55;
+    pmrem.dispose();
     this.scene.background = new THREE.Color(0x05060c);
     this.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 400);
     this.camera.position.set(0, 2, 17);
@@ -1286,6 +1292,7 @@ export class Game {
     p.comboT -= dt;
     p.slashT -= dt;
     p.shootAnim -= dt;
+    this.updateSpinRay(p, dt);
     if (input.isDown('shoot')) {
       p.charge += dt;
       const lv = p.charge > 1.4 ? 2 : p.charge > 0.6 ? 1 : 0;
@@ -1307,7 +1314,7 @@ export class Game {
       p.chargeLv = 0;
       if (w === 'saber') {
         if (c > 1.2) {
-          this.fire(p, 'wave', 1);
+          this.fire(p, p.kit.cutter ? 'cutter' : 'wave', 1);
         }
       } else if (c > 0.6) {
         this.fire(p, w, c > 1.4 ? 2 : 1);
@@ -1318,7 +1325,7 @@ export class Game {
   fire(p, type, level, idx = 0) {
     const w = p.weapons[idx];
     const free = idx === 0;
-    if (!free && type !== 'wave') {
+    if (!free && type !== 'wave' && !(type === 'cutter' && level > 0 && idx === 0)) {
       const cost = level ? 3 : 1;
       if (p.energy[w] < cost) {
         play('buzz');
@@ -1330,14 +1337,55 @@ export class Game {
     if (!['buster', 'wave'].includes(type) && level === 2) {
       level = 1;
     }
+    if (type === 'spinray') {
+      // ローリング・レイ：跳び上がって空中で回転しながら全方位に光線弾
+      p.spinT = 0.9;
+      p.spinTick = 0;
+      p.spinN = 0;
+      p.vy = Math.max(p.vy, 13);
+      p.shootT = 0.9;
+      play('zap');
+      return;
+    }
     p.shootT = 0.14;
     p.shootAnim = 0.3;
     const x = p.x + p.dir * 0.7;
     const y = p.y + p.h * 0.6;
+    if (type === 'cutter') {
+      // 剣を下から上へ斬り上げる軌跡 → 巨大カッター発射
+      p.slashT = 0.3;
+      for (let k = 0; k < 14; k++) {
+        const a = -1.2 + (k / 13) * 2.6;
+        this.particles.emit(p.x + p.dir * Math.cos(a) * 1.3, p.y + p.h * 0.5 + Math.sin(a) * 1.3, k % 3 ? 0x5ff0ff : 0xffffff, 1, { speed: 1.2, life: 0.3, size: 0.55 });
+      }
+      this.shake(0.1);
+    }
     this.spawnShot('ally', type, x, y, p.dir, level, myId);
     this.muzzleFx(type, x, y, p.dir, level);
     this.emitShot(type, x, y, p.dir, level);
     play(type === 'buster' ? 'shot' : 'zap');
+  }
+
+  updateSpinRay(p, dt) {
+    if (!(p.spinT > 0)) {
+      return;
+    }
+    p.spinT -= dt;
+    p.vy = Math.max(p.vy, -1.5); // 空中で滞空
+    p.spinTick -= dt;
+    if (p.spinTick <= 0) {
+      p.spinTick = 0.22;
+      p.spinN++;
+      const x = p.x;
+      const y = p.y + p.h * 0.55;
+      for (let k = 0; k < 6; k++) {
+        const a = p.spinN * 0.5 + (k / 6) * Math.PI * 2;
+        this.spawnShot('ally', 'ray', x, y, 1, 0, myId, { angle: a });
+        this.emitShot('ray', x, y, 1, 0, a);
+      }
+      this.particles.emit(x, y, 0x66ff88, 10, { ring: true, speed: 5, life: 0.3, size: 0.5 });
+      play('zap');
+    }
   }
 
   slash(p) {
@@ -1480,6 +1528,14 @@ export class Game {
         setV(15); sh.dmg = 2; sh.r = 0.45; sh.pierce = true; sh.walls = false; sh.beh = 'boomer'; sh.life = 1.6; vis = 'blade'; break;
       case 'laser':
         setV(38); sh.dmg = level ? 4 : 2; sh.r = 0.3; sh.pierce = true; sh.walls = false; vis = 'beam'; sh.life = 0.8; break;
+      case 'cutter':
+        // 巨大な三日月カッター（斬り上げで放ち、水平に伸びていく）
+        setV(12); sh.vy = 4; sh.dmg = level ? 5 : 4; sh.r = level ? 1.4 : 1.1; sh.pierce = true; sh.walls = false; sh.beh = 'cutter'; sh.life = 1.6; vis = 'crescent'; break;
+      case 'mine':
+        // 設置型地雷：足元に落ち、0.6秒後に起動。触れると爆発
+        sh.vx = dir * 2.5; sh.vy = 3; sh.dmg = 3; sh.r = 0.45; sh.beh = 'landmine'; sh.life = 7; sh.walls = false; vis = 'mine'; break;
+      case 'ray':
+        setV(17); sh.dmg = 1.5; sh.r = 0.22; sh.walls = false; vis = 'beam'; sh.life = 0.9; break;
       case 'spread': {
         const base = ang !== undefined ? ang : dir > 0 ? 0 : Math.PI;
         const n = level ? 5 : 3;
@@ -1545,6 +1601,14 @@ export class Game {
     } else if (vis === 'blade') {
       mesh = new THREE.Mesh(g.crescent, basicMat(color));
       mesh.scale.setScalar(0.55);
+    } else if (vis === 'mine') {
+      mesh = new THREE.Mesh(g.sphere, new THREE.MeshStandardMaterial({ color: 0x3a3e46, metalness: 0.8, roughness: 0.35 }));
+      mesh.scale.set(sh.r * 0.9, sh.r * 0.45, sh.r * 0.9);
+      const lamp = new THREE.Mesh(g.sphere, basicMat(color));
+      lamp.scale.set(0.35, 0.7, 0.35);
+      lamp.position.y = 0.9;
+      mesh.add(lamp);
+      sh.lamp = lamp;
     } else if (vis === 'spikeball') {
       mesh = new THREE.Mesh(g.sphere, basicMat(0x2a2a30));
       mesh.scale.setScalar(sh.r * 0.8);
@@ -1709,7 +1773,7 @@ export class Game {
     if ((sh.beh === 'bomb' || sh.beh === 'arc') && !sh.blasted) {
       sh.blasted = true;
       this.blast(sh.x, sh.y, sh.team, sh.color, 1.2, sh.fromEnemy ? 2 : 4);
-    } else if (sh.beh === 'spikebounce' && !sh.blasted) {
+    } else if ((sh.beh === 'spikebounce' || sh.beh === 'landmine') && !sh.blasted) {
       sh.blasted = true;
       this.spikeBlast(sh);
     }
@@ -1946,7 +2010,7 @@ export class Game {
   }
 
   weaponOf(type) {
-    return type === 'wave' || type === 'slash' ? 'saber' : type === 'spreadp' ? 'spread' : type;
+    return type === 'wave' || type === 'slash' ? 'saber' : type === 'spreadp' ? 'spread' : type === 'ray' ? 'spinray' : type;
   }
 
   nearestTarget(sh) {
@@ -2028,6 +2092,26 @@ export class Game {
             sh.vx = -sh.vx;
           }
           break;
+        case 'cutter':
+          sh.vy *= Math.max(0, 1 - 5 * dt);
+          sh.mesh.rotation.z += sh.dir * dt * 16;
+          if (Math.random() < 0.7) {
+            this.particles.emit(sh.x - sh.dir * 0.6, sh.y + (Math.random() - 0.5) * sh.r * 1.6, 0x9ff8ff, 1, { speed: 0.6, life: 0.3, size: 0.45 });
+          }
+          break;
+        case 'landmine':
+          if (!sh.landed) {
+            sh.vy += GRAV * 0.8 * dt;
+            if (sh.vy < 0 && this.pointSolid(sh.x, sh.y - sh.r * 0.5)) {
+              sh.landed = true;
+              sh.vx = 0;
+              sh.vy = 0;
+            }
+          }
+          if (sh.lamp) {
+            sh.lamp.visible = sh.t < 0.6 || Math.floor(sh.t * (sh.life < 1.5 ? 12 : 4)) % 2 === 0;
+          }
+          break;
         case 'boomer':
           sh.vx -= sh.dir * 26 * dt;
           sh.mesh.rotation.z += dt * 20;
@@ -2095,6 +2179,9 @@ export class Game {
       if (sh.life <= 0 || Math.abs(sh.x - this.camX) > 30) {
         this.removeShot(i, false);
         continue;
+      }
+      if (sh.beh === 'landmine' && sh.t < 0.6) {
+        continue; // 起動前の地雷は当たらない
       }
       let gone = false;
       if (sh.team === 'ally') {
@@ -3480,6 +3567,9 @@ export class Game {
   }
 
   animFor(p) {
+    if (p.spinT > 0) {
+      return 'spin';
+    }
     if (!p.onGround) {
       return 'jump';
     }
@@ -3499,6 +3589,15 @@ export class Game {
     rig.group.position.set(o.x, o.y, 0);
     const targetRot = o.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
     rig.inner.rotation.y += (targetRot - rig.inner.rotation.y) * Math.min(1, dt * 18);
+    // 空中回転技（ローリング・レイ）
+    if (anim === 'spin') {
+      rig.group.rotation.y = this.time * 24;
+      rig.spun = true;
+      anim = 'jump';
+    } else if (rig.spun) {
+      rig.group.rotation.y = 0;
+      rig.spun = false;
+    }
     if (rig.mixer) {
       if (anim === 'shoot' && !Object.keys(rig.actions).some(k => k.includes('shoot'))) {
         anim = 'idle';
@@ -3572,7 +3671,8 @@ export class Game {
       if (++rl.c > 30) {
         return;
       }
-      const sh = this.spawnShot(n.hostile ? 'foe' : 'ally', e.type, e.x, e.y, e.dir, e.level, e.from);
+      const opts = Number.isFinite(e.ang) && Math.abs(e.ang) < 100 ? { angle: e.ang } : {};
+      const sh = this.spawnShot(n.hostile ? 'foe' : 'ally', e.type, e.x, e.y, e.dir, e.level, e.from, opts);
       if (sh && e.type === 'slash' && n.ghosts[e.from]) {
         sh.follow = n.ghosts[e.from];
       }
@@ -3626,9 +3726,9 @@ export class Game {
     this.net = null;
   }
 
-  emitShot(type, x, y, dir, level) {
+  emitShot(type, x, y, dir, level, ang) {
     if (this.net && !this.net.quiet) {
-      this.net.room.emit('shot', { type, x, y, dir, level, stage: this.stage.id });
+      this.net.room.emit('shot', { type, x, y, dir, level, stage: this.stage.id, ...(Number.isFinite(ang) ? { ang } : {}) });
     }
   }
 

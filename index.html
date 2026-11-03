@@ -242,6 +242,28 @@
       .rcell img { width:100%; aspect-ratio:1; object-fit:cover; display:block; }
       .rcell.sel { outline-color:var(--gold); }
       .rcell.taken { opacity:.3; pointer-events:none; }
+      /* 画面バランス：内容が多い画面でも上下が切れずにスクロールでき、PC・スマホの両方で収まるよう縮小 */
+      .screen { justify-content:flex-start; }
+      .screen > :first-child { margin-top:auto; }
+      .screen > :last-child { margin-bottom:auto; }
+      .btn { min-width:min(220px,72vw); }
+      .cards .card { width:min(200px,42vw); }
+      @media (max-height:720px), (max-width:600px) {
+        .screen { gap:8px; padding-top:calc(env(safe-area-inset-top) + 10px); padding-bottom:calc(env(safe-area-inset-bottom) + 10px); }
+        .panel { padding:10px 12px; }
+        .panel.col { gap:6px; }
+        .btn { font-size:15px; padding:7px 14px; }
+        .btn.small { font-size:13px; padding:5px 9px; }
+        h1.logo { font-size:clamp(24px,6vw,44px); }
+        h2 { font-size:clamp(18px,3.4vw,24px); }
+        .rgrid { grid-template-columns:repeat(auto-fill,minmax(58px,1fr)); gap:4px; }
+        .sub { font-size:12px; }
+      }
+      @media (max-height:480px) {
+        .panel.col { flex-direction:row; flex-wrap:wrap; justify-content:center; }
+        .rgrid { grid-template-columns:repeat(auto-fill,minmax(50px,1fr)); width:min(760px,96vw); }
+        .rcell { font-size:9px; }
+      }
       input[type=text] { font-family:'Russo One'; font-size:26px; letter-spacing:6px; text-align:center; text-transform:uppercase; width:220px; padding:8px; background:#0b0f18; color:var(--gold); border:2px solid var(--edge); border-radius:4px; }
       input[type=range] { width:200px; }
       label { display:flex; gap:10px; align-items:center; justify-content:space-between; width:min(360px,80vw); }
@@ -373,6 +395,7 @@
           <li>隠しボス、最終要塞4ステージ、2段階変身するラスボス</li>
           <li>パスワードで続きから遊べる</li>
           <li>オフライン対戦（自分＋COM最大3体、全キャラクター使用可能）</li>
+          <li>剣客「ヴェスパ」の斬り上げ巨大カッター、老発明家「ドク・ガルヴァ」の地雷設置と空中回転レーザーなど、キャラごとの固有技</li>
           <li>オンライン協力プレイ（2人）・対戦（2人／4人）</li>
           <li>PC（キーボード・ゲームパッド）とスマートフォンのタッチ操作に対応</li>
         </ul>

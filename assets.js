@@ -5,7 +5,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 // 起動時に必須のモデルのみ先に読み込み、終盤・特殊キャラ用は後から裏で読み込む（初回表示を高速化）
 const MODELS = ['vb-hero-van', 'vb-hero-rei', 'enemy-walker'];
-const DEFERRED = ['overlord', 'vb-operator-brute', 'vb-staff-hornet'];
+const DEFERRED = ['overlord', 'vb-operator-brute', 'vb-staff-hornet2', 'vb-staff-sage'];
 const pendingModels = {};
 const TEXTURES = ['vb-tile-floor', 'vb-tile-wall', 'vb-bossroom-wall', 'vb-bg-city', 'vb-bg-fortress', 'vb-i-hs', 'vb-i-hl', 'vb-i-en', 'vb-i-up', 'vb-i-tank'];
 
@@ -131,11 +131,29 @@ export function makeModel(name, { height = 1.7, tint = null, emissive = null } =
   return { group, inner, mixer, actions, current: null };
 }
 
+const ANIM_PREF = {
+  run: ['run', 'sprint_loop', 'walk'],
+  jump: ['jump_loop', 'ninjajump_idle_loop', 'jump'],
+  idle: ['idle', 'sword_idle'],
+  sword: ['sword_attack', 'sword_regular_a', 'sword'],
+  shoot: ['pistol_shoot', 'spell_simple_shoot', 'shoot'],
+};
+
 export function playAnim(rig, keyword) {
   if (!rig.mixer || rig.currentKey === keyword) {
     return;
   }
-  const key = Object.keys(rig.actions).find(k => k.includes(keyword));
+  // 用途ごとに最適なクリップを優先（ループ系を優先し、自然な歩行・ジャンプにする）
+  const keys = Object.keys(rig.actions);
+  const pref = ANIM_PREF[keyword] || [keyword];
+  let key = null;
+  for (const c of pref) {
+    key = keys.find(k => k === c) || keys.find(k => k.startsWith(c));
+    if (key) {
+      break;
+    }
+  }
+  key = key || keys.find(k => k.includes(keyword));
   if (!key) {
     return;
   }
