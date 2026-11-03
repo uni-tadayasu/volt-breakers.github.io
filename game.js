@@ -3,7 +3,9 @@ import * as THREE from 'three';
 import { WEAPONS, findKit } from './data.js';
 import { input } from './input.js';
 import { play, playMusic, setTrack } from './audio.js';
-import { makeModel, playAnim, getTexture } from './assets.js';
+import { makeModel, playAnim, getTexture, ensureModel, hasModel } from './assets.js';
+
+const DEFERRED_MODELS = ['overlord', 'vb-operator-brute'];
 import { myId } from './net.js';
 
 // オンライン同期の版番号（見た目・技の仕様を変えたら上げる）
@@ -372,8 +374,12 @@ function makePrimEnemy(type) {
 export class Game {
   constructor(container, ui) {
     this.ui = ui;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    // 軽量化：高DPR端末ではMSAAを省略（解像度で十分滑らか）し、解像度上限を抑える
+    const dpr = window.devicePixelRatio || 1;
+    const mobile = matchMedia('(pointer:coarse)').matches;
+    this.maxDpr = Math.min(dpr, mobile ? 1.5 : 1.75);
+    this.renderer = new THREE.WebGLRenderer({ antialias: dpr < 1.5, powerPreference: 'high-performance', stencil: false });
+    this.renderer.setPixelRatio(this.maxDpr);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     container.appendChild(this.renderer.domElement);
     this.scene = new THREE.Scene();
@@ -411,6 +417,12 @@ export class Game {
 
   // ---------------- lifecycle ----------------
   start(cfg) {
+    // 後読みモデル（ラスボス・宇邇宮）を使うキャラで未読込なら、読み込み完了を待ってから開始
+    if (cfg.kit && DEFERRED_MODELS.includes(cfg.kit.model) && !hasModel(cfg.kit.model) && !cfg._waited) {
+      ensureModel(cfg.kit.model).then(() => this.start({ ...cfg, _waited: true }));
+      return;
+    }
+    DEFERRED_MODELS.forEach(m => ensureModel(m));
     this.cleanup();
     this.cfg = cfg;
     const st = this.stage = cfg.stage;
@@ -527,7 +539,44 @@ export class Game {
         this.updateVisuals(dt);
       }
     }
+    // 軽量化：メニュー表示中（非プレイ時）は描画を間引き、タブ非表示時は描画しない
+    if (document.hidden) {
+      return;
+    }
+    if (!this.running) {
+      this.idleT = (this.idleT || 0) + dt;
+      if (this.idleT < 0.25) {
+        return;
+      }
+      this.idleT = 0;
+    } else {
+      this.adaptQuality(dt);
+    }
     this.renderer.render(this.scene, this.camera);
+  }
+
+  // 動的解像度：フレーム時間に応じて描画解像度を自動調整（重い端末でも滑らかに）
+  adaptQuality(dt) {
+    const q = this.quality || (this.quality = { sum: 0, n: 0, t: 0 });
+    q.sum += dt;
+    q.n++;
+    q.t += dt;
+    if (q.t < 1.5) {
+      return;
+    }
+    const avg = q.sum / q.n;
+    q.sum = q.n = q.t = 0;
+    const cur = this.renderer.getPixelRatio();
+    let next = cur;
+    if (avg > 1 / 48) {
+      next = Math.max(0.6, cur - 0.15);
+    } else if (avg < 1 / 58 && cur < this.maxDpr) {
+      next = Math.min(this.maxDpr, cur + 0.1);
+    }
+    if (Math.abs(next - cur) > 0.01) {
+      this.renderer.setPixelRatio(next);
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
   }
 
   // ---------------- level ----------------
@@ -3639,7 +3688,7 @@ export class Game {
         const mine = NET_VER > (pr.ver || 0);
         this.ui.toast(mine ? '相手の端末が古い版です。相手にページの再読み込みをお願いしてください' : 'この端末は古い版です。ページを再読み込みしてください', 5);
       }
-      const look = `${pr.kit}|${pr.km || ''}|${pr.kf ? 1 : 0}`;
+      const look = `${pr.kit}|${pr.km || ''}|${pr.kf ? 1 : 0}|${pr.km && hasModel(pr.km) ? 1 : 0}`;
       if (gh && gh.look !== look) {
         // 古いプレゼンス（前回のキャラ）で作られたゴーストを作り直す
         this.world.remove(gh.rig.group);

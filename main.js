@@ -6,8 +6,8 @@ import {
 } from './data.js';
 import { input } from './input.js';
 import { unlock, play, setVolumes, playMusic, stopMusic } from './audio.js';
-import { loadAll } from './assets.js';
-import { Room, myId } from './net.js';
+import { loadAll, loadDeferred } from './assets.js';
+import { Room, myId, preloadNet } from './net.js';
 import { ui, show, btn, cutscene, clearScreen, addCleanup, setupTouch, touchPref, applyTouch } from './screens.js';
 
 const $ = s => document.querySelector(s);
@@ -90,6 +90,9 @@ async function boot() {
     }
   });
   title();
+  // タイトル表示後、残りのモデルとオンライン機能をアイドル時に先読み
+  loadDeferred();
+  preloadNet();
 }
 
 function title() {

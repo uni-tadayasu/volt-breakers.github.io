@@ -46,7 +46,13 @@
     <meta name="description" content="VOLT BREAKERS（ヴォルト・ブレイカーズ）は、ブラウザで今すぐ無料で遊べる3D横スクロールアクションゲーム。ダッシュ・壁蹴り・チャージショットを駆使して暴走した8体の守護機を倒し、特殊武器を手に入れろ。協力・対戦のオンラインマルチプレイ、PC・スマホ・ゲームパッド対応、パスワードで続きから遊べます。" />
     <meta name="keywords" content="VOLT BREAKERS,ヴォルト・ブレイカーズ,アクションゲーム,横スクロール,3Dアクション,ブラウザゲーム,無料ゲーム,オンライン協力,オンライン対戦,スマホゲーム,ボスバトル" />
     <meta name="author" content="VOLT BREAKERS Project" />
-    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="bingbot" content="index, follow" />
+    <meta name="rating" content="general" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta http-equiv="content-language" content="ja" />
+    <meta name="msapplication-TileColor" content="#0a1430" />
     <meta name="theme-color" content="#0a1430" />
     <meta name="color-scheme" content="dark" />
     <meta name="application-name" content="VOLT BREAKERS" />
@@ -74,6 +80,8 @@
     <meta name="twitter:image" content="assets/vb-preview.webp" />
     <meta name="twitter:image:alt" content="VOLT BREAKERS キービジュアル：ネオン都市で戦うヴァンとレイ" />
     <meta property="og:image:type" content="image/webp" />
+    <meta property="og:image:secure_url" content="assets/vb-preview.webp" />
+    <meta name="twitter:domain" content="" />
     <meta property="og:url" content="" />
     <link rel="canonical" href="" />
     <link rel="alternate" hreflang="ja" href="" />
@@ -87,12 +95,16 @@
           document.querySelector('link[rel=canonical]').href = url;
           document.querySelectorAll('link[rel=alternate][hreflang]').forEach(l => (l.href = url));
           document.querySelector('meta[property="og:url"]').content = url;
-          ['meta[property="og:image"]', 'meta[name="twitter:image"]'].forEach(s => {
+          const td = document.querySelector('meta[name="twitter:domain"]');
+          if (td) td.content = location.hostname;
+          ['meta[property="og:image"]', 'meta[property="og:image:secure_url"]', 'meta[name="twitter:image"]'].forEach(s => {
             const m = document.querySelector(s);
             if (m) m.content = abs(m.getAttribute('content'));
           });
-          document.querySelectorAll('script[type="application/ld+json"]').forEach(s => {
-            s.textContent = s.textContent.replace(/"__URL__"/g, JSON.stringify(url)).replace(/"__IMG__"/g, JSON.stringify(abs('assets/vb-preview.webp')));
+          document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('script[type="application/ld+json"]').forEach(s => {
+              s.textContent = s.textContent.replace(/"__URL__"/g, JSON.stringify(url)).replace(/"__IMG__"/g, JSON.stringify(abs('assets/vb-preview.webp')));
+            });
           });
         } catch (e) {}
       })();
@@ -132,6 +144,21 @@
             ],
             "author": { "@type": "Organization", "name": "VOLT BREAKERS Project" },
             "isAccessibleForFree": true,
+            "potentialAction": { "@type": "PlayAction", "target": "__URL__" },
+            "audience": { "@type": "PeopleAudience", "suggestedMinAge": 7 },
+            "contentRating": "全年齢",
+            "gameItem": [
+              { "@type": "Thing", "name": "フォージ・フレア" }, { "@type": "Thing", "name": "グレイシャル・ニードル" },
+              { "@type": "Thing", "name": "ゲイル・ドローン" }, { "@type": "Thing", "name": "コイル・ボール" },
+              { "@type": "Thing", "name": "テラ・ウェイブ" }, { "@type": "Thing", "name": "ギア・リング" },
+              { "@type": "Thing", "name": "プリズム・ビーム" }, { "@type": "Thing", "name": "ミアズマ・スプレー" }
+            ],
+            "gameLocation": [
+              { "@type": "Place", "name": "灼熱精錬プラント" }, { "@type": "Place", "name": "極北氷結ベース" },
+              { "@type": "Place", "name": "天空風力塔" }, { "@type": "Place", "name": "発電タワー" },
+              { "@type": "Place", "name": "地下採掘場" }, { "@type": "Place", "name": "歯車工場" },
+              { "@type": "Place", "name": "水晶研究所" }, { "@type": "Place", "name": "化学プラント" }
+            ],
             "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY", "availability": "https://schema.org/InStock" }
           },
           {
@@ -146,9 +173,15 @@
         ]
       }
     </script>
+    <!-- 高速化：接続の事前確立とモジュール先読み -->
+    <link rel="preconnect" href="https://esm.sh" crossorigin>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Russo+One&display=swap" rel="stylesheet">
+    <link rel="dns-prefetch" href="https://storage.googleapis.com">
+    <!-- フォントは描画をブロックしないよう非同期読み込み -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Russo+One&display=swap">
+    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Russo+One&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Russo+One&display=swap" rel="stylesheet"></noscript>
     <link rel="stylesheet" href="./rosebud-game-defaults.css" />
     <script src="./rosebud-game-defaults.js" defer></script>
     <script type="importmap">
@@ -161,6 +194,12 @@
         }
       }
     </script>
+    <link rel="modulepreload" href="https://esm.sh/three@0.184.0" crossorigin>
+    <link rel="modulepreload" href="main.js">
+    <link rel="modulepreload" href="game.js">
+    <link rel="modulepreload" href="data.js">
+    <link rel="modulepreload" href="assets.js">
+    <link rel="modulepreload" href="screens.js">
     <style>
       :root { --ink:#e8f1ff; --steel:#1a2232; --steel2:#26324a; --edge:#5fc8ff; --hot:#ff4a5a; --gold:#ffd25a; }
       html, body, #game-container { width:100%; height:100%; margin:0; padding:0; background:#050505; overflow:hidden; }
@@ -345,6 +384,23 @@
           <li>ヴァン：3段階チャージのアーク・ブラスターで戦う射撃型。</li>
           <li>レイ：3連撃と衝撃波を放つフォトン・ブレードの近接型。</li>
         </ul>
+      </section>
+      <section>
+        <h2>8体のボスとステージ</h2>
+        <ul>
+          <li>イグニス・フォージ（灼熱精錬プラント）：フォージ・フレア</li>
+          <li>グレイシア・ベル（極北氷結ベース）：グレイシャル・ニードル</li>
+          <li>テンペスト・ヴェイン（天空風力塔）：ゲイル・ドローン</li>
+          <li>ヴォルテクス・コイル（発電タワー）：コイル・ボール</li>
+          <li>テラ・ハンマー（地下採掘場）：テラ・ウェイブ</li>
+          <li>スピン・ギアード（歯車工場）：ギア・リング</li>
+          <li>プリズマ・レンズ（水晶研究所）：プリズム・ビーム</li>
+          <li>ミアズマ・フラスコ（化学プラント）：ミアズマ・スプレー</li>
+        </ul>
+      </section>
+      <section>
+        <h2>遊び方のコツ</h2>
+        <p>壁に張り付いてずり落ち、壁蹴りで高所へ。ダッシュジャンプで遠くまで跳べます。ボスごとに弱点武器が決まっていて、弱点の連鎖をたどると有利に攻略できます。ステージには回復アイテム、武器エネルギー、1UP、回復セル、隠し能力カプセルが隠されています。</p>
       </section>
       <section>
         <h2>特殊武器</h2>
