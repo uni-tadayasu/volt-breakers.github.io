@@ -984,6 +984,48 @@ export class Game {
     rig.glow = new THREE.Sprite(spriteMat(0xffffff));
     rig.glow.visible = false;
     rig.group.add(rig.glow);
+    if (kit.flail) {
+      // 運営キャラ：背中から鎖でつながったトゲ鉄球
+      const g = geo();
+      const H = kit.height || 1.75;
+      const steel = new THREE.MeshStandardMaterial({ color: 0x3a3d44, metalness: 0.9, roughness: 0.3 });
+      const chrome = new THREE.MeshStandardMaterial({ color: 0xd8dde4, metalness: 1, roughness: 0.15 });
+      this.disposables.push(steel, chrome);
+      const ball = new THREE.Mesh(g.sphere, steel);
+      ball.scale.setScalar(H * 0.2);
+      for (let k = 0; k < 10; k++) {
+        const s = new THREE.Mesh(g.cone, chrome);
+        const phi = Math.acos(1 - 2 * (k + 0.5) / 10);
+        const th = k * 2.4;
+        const v = new THREE.Vector3(Math.sin(phi) * Math.cos(th), Math.cos(phi), Math.sin(phi) * Math.sin(th));
+        s.position.copy(v).multiplyScalar(1.05);
+        s.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v);
+        s.scale.set(0.35, 0.6, 0.35);
+        ball.add(s);
+      }
+      const base = new THREE.Vector3(-H * 0.05, H * 1.15, -H * 0.25);
+      ball.position.copy(base);
+      const beads = [];
+      for (let k = 1; k <= 7; k++) {
+        const b = new THREE.Mesh(g.sphere, chrome);
+        b.scale.setScalar(H * 0.035);
+        beads.push(b);
+        rig.group.add(b);
+      }
+      const anchor = new THREE.Vector3(0, H * 0.75, -H * 0.2);
+      ball.onBeforeRender = () => {
+        const t = performance.now() / 1000;
+        ball.position.set(base.x + Math.sin(t * 1.7) * H * 0.06, base.y + Math.sin(t * 2.3) * H * 0.05, base.z);
+        ball.rotation.y = t * 1.2;
+        beads.forEach((b, i) => {
+          const k = (i + 1) / 8;
+          b.position.lerpVectors(anchor, ball.position, k);
+          b.position.y += Math.sin(k * Math.PI) * H * 0.12;
+        });
+      };
+      rig.group.add(ball);
+      rig.flail = ball;
+    }
     this.world.add(rig.group);
     return rig;
   }
@@ -1364,6 +1406,10 @@ export class Game {
         setV(8); sh.dmg = level ? 3 : 1.5; sh.r = 0.3; sh.beh = 'homing'; sh.life = 2.4; sh.walls = false; break;
       case 'spark':
         sh.vx = dir * 7; sh.vy = 5; sh.dmg = level ? 4 : 2; sh.r = level ? 0.6 : 0.35; sh.beh = 'bounce'; sh.life = 2.6; sh.walls = false; break;
+      case 'spikebomb':
+        // トゲトゲボム：放物線で放ち、地面で数回バウンドしてから爆発
+        sh.vx = dir * (level ? 8 : 6.5); sh.vy = level ? 7 : 6; sh.dmg = level ? 5 : 3; sh.r = level ? 0.6 : 0.45;
+        sh.beh = 'spikebounce'; sh.bounces = level ? 4 : 3; sh.life = 3.2; sh.walls = false; sh.pierce = !!level; vis = 'spikeball'; break;
       case 'quake':
         sh.y = this.groundAt(x, y + 0.5); setV(10); sh.vy = 0; sh.dmg = level ? 5 : 3; sh.r = 0.8; sh.pierce = true; sh.walls = true; sh.life = 1.2; vis = 'pillar'; sh.beh = 'quake'; break;
       case 'boomerang':
@@ -1435,6 +1481,19 @@ export class Game {
     } else if (vis === 'blade') {
       mesh = new THREE.Mesh(g.crescent, basicMat(color));
       mesh.scale.setScalar(0.55);
+    } else if (vis === 'spikeball') {
+      mesh = new THREE.Mesh(g.sphere, basicMat(0x2a2a30));
+      mesh.scale.setScalar(sh.r * 0.8);
+      if (!g.spikeCone) g.spikeCone = new THREE.ConeGeometry(0.35, 0.9, 6);
+      const dirs = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1],[1,1,1],[-1,1,1],[1,-1,1],[-1,-1,1],[1,1,-1],[-1,1,-1],[1,-1,-1],[-1,-1,-1]];
+      const up = new THREE.Vector3(0, 1, 0);
+      for (const d of dirs) {
+        const v = new THREE.Vector3(...d).normalize();
+        const s = new THREE.Mesh(g.spikeCone, basicMat(color));
+        s.position.copy(v).multiplyScalar(1.15);
+        s.quaternion.setFromUnitVectors(up, v);
+        mesh.add(s);
+      }
     } else {
       mesh = new THREE.Mesh(g.sphere, basicMat(0xffffff));
       mesh.scale.setScalar(sh.r * 0.7);
@@ -1586,6 +1645,9 @@ export class Game {
     if ((sh.beh === 'bomb' || sh.beh === 'arc') && !sh.blasted) {
       sh.blasted = true;
       this.blast(sh.x, sh.y, sh.team, sh.color, 1.2, sh.fromEnemy ? 2 : 4);
+    } else if (sh.beh === 'spikebounce' && !sh.blasted) {
+      sh.blasted = true;
+      this.spikeBlast(sh);
     }
   }
 
@@ -1601,6 +1663,17 @@ export class Game {
       this.boomCD = 0.12;
     }
     this.shake(0.12);
+  }
+
+  // トゲトゲボムの爆発（味方側の固定ダメージ爆風＋トゲ破片）
+  spikeBlast(sh) {
+    const r = sh.r > 0.5 ? 1.8 : 1.4;
+    const b = this.spawnShot(sh.team, 'orb', sh.x, sh.y, 1, 0, sh.owner, { speed: 0, color: sh.color, ov: { r, life: 0.18, pierce: true, walls: false, dmg: sh.r > 0.5 ? 4 : 3, fixed: true } });
+    b.mesh.visible = false;
+    this.particles.emit(sh.x, sh.y, sh.color, 16, { ring: true, speed: 7, life: 0.35, size: 0.7 });
+    this.particles.emit(sh.x, sh.y, 0xffee99, 10, { speed: 4, life: 0.45, size: 0.8 });
+    if (this.boomCD <= 0) { play('boom'); this.boomCD = 0.12; }
+    this.shake(0.15);
   }
 
   mineBurst(e) {
@@ -1867,6 +1940,25 @@ export class Game {
           if (sh.vy < 0 && this.pointSolid(sh.x, sh.y - sh.r)) {
             sh.vy = 8;
             play('zap');
+          }
+          if (this.pointSolid(sh.x + Math.sign(sh.vx) * sh.r, sh.y)) {
+            sh.vx = -sh.vx;
+          }
+          break;
+        case 'spikebounce':
+          sh.vy += GRAV * 0.6 * dt;
+          sh.mesh.rotation.z -= Math.sign(sh.vx || 1) * dt * 10;
+          sh.mesh.rotation.x += dt * 4;
+          if (sh.vy < 0 && this.pointSolid(sh.x, sh.y - sh.r)) {
+            sh.bounces--;
+            if (sh.bounces <= 0) {
+              sh.life = 0;
+            } else {
+              sh.vy = 7.5;
+              sh.vx *= 0.92;
+              play('zap');
+              this.particles.emit(sh.x, sh.y - sh.r, 0xffaa55, 5, { speed: 3, life: 0.3, size: 0.4 });
+            }
           }
           if (this.pointSolid(sh.x + Math.sign(sh.vx) * sh.r, sh.y)) {
             sh.vx = -sh.vx;

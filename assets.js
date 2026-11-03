@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
-const MODELS = ['vb-hero-van', 'vb-hero-rei', 'overlord', 'enemy-walker'];
+const MODELS = ['vb-hero-van', 'vb-hero-rei', 'overlord', 'enemy-walker', 'vb-operator-brute'];
 const TEXTURES = ['vb-tile-floor', 'vb-tile-wall', 'vb-bossroom-wall', 'vb-bg-city', 'vb-bg-fortress', 'vb-i-hs', 'vb-i-hl', 'vb-i-en', 'vb-i-up', 'vb-i-tank'];
 
 const models = {};

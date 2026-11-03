@@ -11,6 +11,7 @@ export const WEAPONS = {
   boomerang: { name: 'ギア・リング', color: 0xffa53a },
   laser: { name: 'プリズム・ビーム', color: 0xff5ad8 },
   spread: { name: 'ミアズマ・スプレー', color: 0xb070ff },
+  spikebomb: { name: 'スパイク・ボム', color: 0xff3a2a },
 };
 
 export const HEROES = [
@@ -116,7 +117,11 @@ export function bossKit(def) {
   };
 }
 
-export const OVERLORD_KIT = { ...bossKit(OVERLORD), hp: 60, weapon: 'laser', color: 0xff2244 };
+// 運営者専用キャラ：重装破城機「宇邇宮」（トゲ鉄球を操る巨漢ロボ）
+export const OVERLORD_KIT = {
+  id: 'operator', name: '宇邇宮', model: 'vb-operator-brute', height: 2.1, weapon: 'spikebomb',
+  color: 0xd8202a, hp: 60, portrait: 'assets/vb-p-operator.webp', flail: true, desc: 'トゲ鉄球と鉄拳の重装破城機（運営専用）',
+};
 
 export function versusRoster(isOperator) {
   const list = [

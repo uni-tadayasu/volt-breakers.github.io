@@ -576,7 +576,7 @@ function invadeScreen() {
       exitStage = invadeScreen;
       clearScreen();
       game.start({
-        stage: st, kit: { ...OVERLORD_KIT, name: '宇邇宮' }, mode: 'invader', weapons: ['laser', 'spread', 'homing', 'fire'], lives: 0, etanks: 0,
+        stage: st, kit: { ...OVERLORD_KIT }, mode: 'invader', weapons: ['spikebomb', 'boomerang', 'quake', 'spark', 'fire'], lives: 0, etanks: 0,
         room: h, hostile: true, targetPid: pid, onPause: openPause,
         onEnd: (kind, r) => {
           game.stop();
