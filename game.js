@@ -3583,6 +3583,7 @@ export class Game {
         inGame: true, stage: this.stage.id, mode: this.mode, x: +p.x.toFixed(2), y: +p.y.toFixed(2), dir: p.dir,
         kit: p.kit.id, anim: this.animFor(p), dead: p.dead, name: p.kit.name,
         // 見た目情報も同送：受信側のデータ版が違っても正しい外見で描画する
+        hp: Math.max(0, Math.round(p.hp)), max: p.max,
         ver: NET_VER, km: p.kit.model, kh: p.kit.height || 1.75, kt: p.kit.tint ?? null, ke: p.kit.emissive ?? null, kf: !!p.kit.flail,
       });
     }
@@ -3632,6 +3633,20 @@ export class Game {
       if (!seen.has(pid)) {
         this.world.remove(n.ghosts[pid].rig.group);
         delete n.ghosts[pid];
+      }
+    }
+    // 侵入者「宇邇宮」のHPバー：侵入者・被侵入者の両方に同じ値を表示
+    if (this.mode === 'invader') {
+      const hv = Math.max(0, Math.round(p.hp));
+      this.ui.setBoss(hv, p.max, `${p.kit.name}（あなた） ${hv}/${p.max}`);
+    } else if (!this.bosses.length) {
+      const inv = n.only && n.only !== '__none__' && n.ghosts[n.only] ? peers[n.only] : null;
+      if (inv && typeof inv.hp === 'number') {
+        this.ui.setBoss(inv.hp, inv.max || 60, `侵入者 ${inv.name || '宇邇宮'} ${inv.hp}/${inv.max || 60}`);
+        n.invBar = true;
+      } else if (n.invBar) {
+        this.ui.setBoss(0, 1, null);
+        n.invBar = false;
       }
     }
     if (this.mode === 'invader') {
