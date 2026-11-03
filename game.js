@@ -6,6 +6,9 @@ import { play, playMusic, setTrack } from './audio.js';
 import { makeModel, playAnim, getTexture } from './assets.js';
 import { myId } from './net.js';
 
+// オンライン同期の版番号（見た目・技の仕様を変えたら上げる）
+const NET_VER = 20;
+
 const STEP = 1 / 60;
 
 // 特殊能力装置（隠し場所でのみ入手）
@@ -3579,6 +3582,8 @@ export class Game {
       n.room.presence({
         inGame: true, stage: this.stage.id, mode: this.mode, x: +p.x.toFixed(2), y: +p.y.toFixed(2), dir: p.dir,
         kit: p.kit.id, anim: this.animFor(p), dead: p.dead, name: p.kit.name,
+        // 見た目情報も同送：受信側のデータ版が違っても正しい外見で描画する
+        ver: NET_VER, km: p.kit.model, kh: p.kit.height || 1.75, kt: p.kit.tint ?? null, ke: p.kit.emissive ?? null, kf: !!p.kit.flail,
       });
     }
     const peers = n.room.peers;
@@ -3596,15 +3601,25 @@ export class Game {
       if (!pr.kit) {
         continue;
       }
-      if (gh && gh.kitId !== pr.kit) {
+      if (pr.ver !== NET_VER && !n.verWarned) {
+        n.verWarned = true;
+        const mine = NET_VER > (pr.ver || 0);
+        this.ui.toast(mine ? '相手の端末が古い版です。相手にページの再読み込みをお願いしてください' : 'この端末は古い版です。ページを再読み込みしてください', 5);
+      }
+      const look = `${pr.kit}|${pr.km || ''}|${pr.kf ? 1 : 0}`;
+      if (gh && gh.look !== look) {
         // 古いプレゼンス（前回のキャラ）で作られたゴーストを作り直す
         this.world.remove(gh.rig.group);
         delete n.ghosts[pid];
         gh = null;
       }
       if (!gh) {
-        const kit = findKit(pr.kit);
-        gh = { pid, kitId: pr.kit, kit, rig: this.makeRig(kit), x: pr.x, y: pr.y, tx: pr.x, ty: pr.y, w: kit.flail ? 1.1 : 0.8, h: kit.height || 1.7, dir: 1, anim: 'idle', visible: true };
+        let kit = findKit(pr.kit);
+        if (pr.km) {
+          // 送信側の外見情報を優先（ローカルに無いキャラ・旧版データでも正しく表示）
+          kit = { ...(kit.id === pr.kit ? kit : {}), id: pr.kit, name: pr.name || kit.name, model: pr.km, height: pr.kh || 1.75, tint: pr.kt ?? undefined, emissive: pr.ke ?? undefined, flail: !!pr.kf };
+        }
+        gh = { pid, look, kitId: pr.kit, kit, rig: this.makeRig(kit), x: pr.x, y: pr.y, tx: pr.x, ty: pr.y, w: kit.flail ? 1.1 : 0.8, h: kit.height || 1.7, dir: 1, anim: 'idle', visible: true };
         n.ghosts[pid] = gh;
       }
       gh.tx = pr.x;
