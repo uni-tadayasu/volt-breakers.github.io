@@ -123,6 +123,21 @@ export const OVERLORD_KIT = {
   color: 0xd8202a, hp: 44, portrait: 'assets/vb-p-operator.webp', flail: true, desc: 'トゲ鉄球と鉄拳の重装破城機（運営専用）',
 };
 
+// スタッフ用侵入キャラ（オリジナルデザイン）
+export const STAFF_KITS = [
+  {
+    id: 'hornet', name: 'ヴェスパ', model: 'vb-staff-hornet', height: 1.85, weapon: 'saber',
+    color: 0x2a3a9a, hp: 36, portrait: 'assets/vb-p-hornet.webp', desc: '三日月兜の光刃剣客。疾風の連撃',
+    weapons: ['saber', 'homing', 'ice', 'boomerang'],
+  },
+  {
+    id: 'sage', name: 'ドク・ガルヴァ', model: 'vb-operator-brute', height: 1.9, weapon: 'spark',
+    tint: 0xf2ece0, emissive: 0x2aff66, color: 0xff8a2a, hp: 40, portrait: 'assets/vb-p-sage.webp', desc: '片眼鏡の老発明家。掌の放電砲',
+    weapons: ['spark', 'laser', 'quake', 'spread'],
+  },
+];
+export const OPERATOR_WEAPONS = ['spikebomb', 'boomerang', 'quake', 'spark', 'fire'];
+
 export function versusRoster(isOperator) {
   const list = [
     ...HEROES.map(heroKit),
@@ -137,7 +152,7 @@ export function versusRoster(isOperator) {
 }
 
 export function findKit(id) {
-  return versusRoster(true).find(k => k.id === id) || HEROES[0];
+  return versusRoster(true).find(k => k.id === id) || STAFF_KITS.find(k => k.id === id) || HEROES[0];
 }
 
 // ---- Password codec (5 chars) ----

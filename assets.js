@@ -5,7 +5,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 // 起動時に必須のモデルのみ先に読み込み、終盤・特殊キャラ用は後から裏で読み込む（初回表示を高速化）
 const MODELS = ['vb-hero-van', 'vb-hero-rei', 'enemy-walker'];
-const DEFERRED = ['overlord', 'vb-operator-brute'];
+const DEFERRED = ['overlord', 'vb-operator-brute', 'vb-staff-hornet'];
 const pendingModels = {};
 const TEXTURES = ['vb-tile-floor', 'vb-tile-wall', 'vb-bossroom-wall', 'vb-bg-city', 'vb-bg-fortress', 'vb-i-hs', 'vb-i-hl', 'vb-i-en', 'vb-i-up', 'vb-i-tank'];
 

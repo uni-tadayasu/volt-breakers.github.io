@@ -5,15 +5,21 @@ import { input } from './input.js';
 import { play, playMusic, setTrack } from './audio.js';
 import { makeModel, playAnim, getTexture, ensureModel, hasModel } from './assets.js';
 
-const DEFERRED_MODELS = ['overlord', 'vb-operator-brute'];
+const DEFERRED_MODELS = ['overlord', 'vb-operator-brute', 'vb-staff-hornet'];
 // ネットワークから受け付ける弾種／モデル名のホワイトリスト
-const SHOT_TYPES = new Set(['buster', 'slash', 'wave', 'fire', 'ice', 'homing', 'spark', 'quake', 'boomerang', 'laser', 'spread', 'spikebomb']);
+export const SHOT_TYPES = new Set(['buster', 'slash', 'wave', 'fire', 'ice', 'homing', 'spark', 'quake', 'boomerang', 'laser', 'spread', 'spikebomb']);
 const NET_MODELS = new Set(['vb-hero-van', 'vb-hero-rei', 'enemy-walker', 'boss-mech', ...DEFERRED_MODELS]);
 const num = (v, lo, hi, d) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
 import { myId } from './net.js';
 
 // オンライン同期の版番号（見た目・技の仕様を変えたら上げる）
-const NET_VER = 20;
+export const NET_VER = 20;
+// アリーナの初期位置：人数に応じて均等に配置（障害物の柱 ±15.6〜17 を避けた座標）
+const ARENA_SLOTS = { 1: [0], 2: [-12, 12], 3: [-18, 0, 18], 4: [-18, -6, 6, 18] };
+export function arenaSpawnX(i, n) {
+  const s = ARENA_SLOTS[Math.max(1, Math.min(4, n | 0))] || ARENA_SLOTS[4];
+  return s[((i | 0) % s.length + s.length) % s.length];
+}
 
 const STEP = 1 / 60;
 
@@ -453,6 +459,9 @@ export class Game {
     this.nextBossT = -1;
     this.tipsShown = new Set();
     this.boomCD = 0;
+    // 開始位置の割り当て（ロビーの並び順。全端末で同じ順番になる）
+    this.spawnIdx = Number.isInteger(cfg.spawnIdx) ? cfg.spawnIdx : 0;
+    this.spawnCount = Number.isInteger(cfg.spawnCount) ? Math.max(1, Math.min(4, cfg.spawnCount)) : 1;
     this.buildLevel(st);
     this.buildScene(st);
     if (cfg.room) {
@@ -1105,15 +1114,14 @@ export class Game {
     let sx;
     let sy;
     if (this.stage.arena) {
-      const ids = [myId, ...Object.keys(this.net ? this.net.room.peers : {})].sort();
-      const idx = first ? Math.max(0, ids.indexOf(myId)) : Math.floor(Math.random() * 4);
-      const sp = this.arenaSpawns[idx % 4];
-      sx = sp[0];
-      sy = sp[1];
+      const n = Math.max(this.spawnCount, 2);
+      sx = arenaSpawnX(first ? this.spawnIdx : Math.floor(Math.random() * n), n);
+      sy = this.groundAt(sx);
     } else {
       const c = this.checkpoints[p.cp];
-      sx = c.x;
-      sy = this.groundAt(c.x);
+      // 協力プレイの初回は横に少しずらして重ならないようにする
+      sx = c.x + (first && this.mode === 'coop' ? this.spawnIdx * 1.4 : 0);
+      sy = this.groundAt(sx);
     }
     Object.assign(p, { x: sx, y: sy + 0.05, vx: 0, vy: 0, hp: p.max, dead: false, inv: 2, dashT: 0, kickT: 0, hurtT: 0, charge: 0, dashCarry: false });
     p.rig.group.visible = true;
@@ -2110,6 +2118,9 @@ export class Game {
             if (gh.visible && !sh.hit.has(gh) && this.hitTest(sh, gh)) {
               sh.hit.add(gh);
               this.particles.emit(sh.x, sh.y, 0xffffff, 6, { speed: 4, life: 0.25 });
+              if (this.net.room.local) {
+                this.net.room.hitPeer(gh.pid, sh.dmg, myId, this);
+              }
               if (!sh.pierce) {
                 gone = true;
               }
@@ -3705,6 +3716,9 @@ export class Game {
   updateNet(dt) {
     const n = this.net;
     const p = this.player;
+    if (n.room.local) {
+      n.room.tick(dt, this); // オフライン対戦：COMを更新
+    }
     n.sendT -= dt;
     if (n.sendT <= 0) {
       n.sendT = 1 / 15;

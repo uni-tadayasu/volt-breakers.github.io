@@ -2,22 +2,26 @@
 import { Game } from './game.js';
 import {
   WEAPONS, HEROES, BOSSES, STAGES, INTRO_STAGE, FINAL_STAGES, ARENA_STAGE,
-  heroKit, versusRoster, findKit, OVERLORD_KIT, encodePassword, decodePassword,
+  heroKit, versusRoster, findKit, OVERLORD_KIT, STAFF_KITS, OPERATOR_WEAPONS, encodePassword, decodePassword,
 } from './data.js';
+import { isOperatorKey, isStaffKey, issueStaffKey, normKey } from './keys.js';
 import { input } from './input.js';
 import { unlock, play, setVolumes, playMusic, stopMusic } from './audio.js';
 import { loadAll, loadDeferred } from './assets.js';
 import { Room, myId, preloadNet } from './net.js';
+import { LocalRoom } from './bots.js';
 import { ui, show, btn, cutscene, clearScreen, addCleanup, setupTouch, touchPref, applyTouch } from './screens.js';
 
 const $ = s => document.querySelector(s);
 // XSS対策：外部（ネットワーク）由来の文字列はHTMLエスケープしてから表示
 const esc = v => String(v).slice(0, 40).replace(/[&<>"'`]/g, c => `&#${c.charCodeAt(0)};`);
-const OP_KEY = 'OVERLORD-ADMIN';
 const BG = img => `background-image:linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.7)),url('${img}')`;
 
 // ---------- save ----------
-const DEFAULTS = { hero: 0, cleared: 0, hidden: 0, etanks: 0, intro: false, bgm: 0.55, sfx: 0.8, touch: 'auto', operator: false };
+const DEFAULTS = { hero: 0, cleared: 0, hidden: 0, etanks: 0, intro: false, bgm: 0.55, sfx: 0.8, touch: 'auto', operator: false, staffKey: '' };
+// スタッフ権限は保存されたキー文字列を毎回検証（フラグ書き換えだけでは有効にならない）
+const isStaff = () => isStaffKey(save.staffKey);
+const canInvade = () => save.operator || isStaff();
 let save;
 try {
   const raw = JSON.parse(localStorage.getItem('nih-save') || '{}');
@@ -30,6 +34,7 @@ try {
       hero: v => int(v, 0, 1), cleared: v => int(v, 0, 255), hidden: v => int(v, 0, 7), etanks: v => int(v, 0, 9), parts: v => int(v, 0, 15),
       intro: v => (typeof v === 'boolean' ? v : undefined), bgm: vol, sfx: vol,
       touch: v => (['auto', 'on', 'off'].includes(v) ? v : undefined), operator: v => (typeof v === 'boolean' ? v : undefined),
+      staffKey: v => (typeof v === 'string' && isStaffKey(v) ? normKey(v) : undefined),
     };
     for (const k of Object.keys(chk)) {
       if (Object.prototype.hasOwnProperty.call(raw, k)) {
@@ -153,9 +158,10 @@ function menu() {
       ${btn('new', 'ニューゲーム')}
       ${save.intro ? btn('cont', 'コンティニュー') : ''}
       ${btn('pass', 'パスワード')}
+      ${btn('offline', 'オフライン対戦')}
       ${btn('online', 'オンライン')}
       ${btn('opt', 'オプション')}
-      ${save.operator ? btn('invade', '⚠ 侵入（運営）') : ''}
+      ${canInvade() ? btn('invade', save.operator ? '⚠ 侵入（運営）' : '⚠ 侵入（スタッフ）') : ''}
     </div>`, {
     cls: 'bgimg', style: BG('assets/vb-title2.webp'),
     on: act => {
@@ -169,12 +175,14 @@ function menu() {
         stageSelect();
       } else if (act === 'pass') {
         passwordScreen();
+      } else if (act === 'offline') {
+        offlineMenu();
       } else if (act === 'online') {
         onlineMenu();
       } else if (act === 'opt') {
         options();
       } else if (act === 'invade') {
-        invadeScreen();
+        invadePick();
       }
     },
   });
@@ -397,8 +405,11 @@ function options() {
     <label>BGM <input type="range" id="o-bgm" min="0" max="1" step="0.05" value="${save.bgm}"></label>
     <label>効果音 <input type="range" id="o-sfx" min="0" max="1" step="0.05" value="${save.sfx}"></label>
     <div class="row">タッチ操作 ${['auto', 'on', 'off'].map(m => `<button class="btn small ${save.touch === m ? 'sel' : ''}" data-act="t:${m}">${m.toUpperCase()}</button>`).join('')}</div>
-    <div class="row"><input type="text" id="o-key" placeholder="運営キー" style="font-size:14px;letter-spacing:1px;width:180px">${btn('key', '登録', 'style="min-width:0"')}</div>
-    <div class="sub" id="o-msg">${save.operator ? '運営モード：有効' : ''}</div>
+    <div class="row"><input type="text" id="o-key" maxlength="32" autocomplete="off" spellcheck="false" placeholder="運営キー" style="font-size:14px;letter-spacing:1px;width:180px">${btn('key', '登録', 'style="min-width:0"')}</div>
+    <div class="row"><input type="text" id="o-skey" maxlength="32" autocomplete="off" spellcheck="false" placeholder="スタッフキー VBS-XXXXXX-XXXX" style="font-size:14px;letter-spacing:1px;width:180px">${btn('skey', '登録', 'style="min-width:0"')}</div>
+    <div class="sub" id="o-msg">${save.operator ? '運営モード：有効' : isStaff() ? 'スタッフモード：有効' : ''}</div>
+    ${save.operator ? `<div class="row">${btn('issue', 'スタッフキー発行', 'style="min-width:0"')}<input type="text" id="o-issued" readonly style="font-size:14px;letter-spacing:1px;width:180px"></div>` : ''}
+    ${isStaff() ? btn('unstaff', 'スタッフ登録を解除') : ''}
     ${btn('back', '戻る')}</div>`, {
     back: menu,
     on: act => {
@@ -410,10 +421,28 @@ function options() {
         persist();
         options();
       } else if (act === 'key') {
-        const ok = $('#o-key').value.trim().toUpperCase() === OP_KEY;
+        const ok = isOperatorKey($('#o-key').value);
         save.operator = ok || save.operator;
         persist();
         $('#o-msg').textContent = ok ? '運営モード：有効' : 'キーが違います';
+      } else if (act === 'skey') {
+        const v = normKey($('#o-skey').value);
+        if (isStaffKey(v)) {
+          save.staffKey = v;
+          persist();
+          options();
+        } else {
+          $('#o-msg').textContent = 'スタッフキーが違います';
+        }
+      } else if (act === 'unstaff') {
+        save.staffKey = '';
+        persist();
+        options();
+      } else if (act === 'issue') {
+        const out = $('#o-issued');
+        out.value = issueStaffKey();
+        out.select();
+        navigator.clipboard?.writeText(out.value).then(() => ui.toast('コピーしました', 1.5), () => {});
       }
     },
   });
@@ -572,6 +601,8 @@ function lobby(code, creator = false) {
       return;
     }
     launched = true;
+    const order = state().members;
+    const spawnIdx = Math.max(0, order.indexOf(myId));
     leave();
     clearScreen();
     const proom = new Room(`play-${code}-${e.t}`);
@@ -588,7 +619,7 @@ function lobby(code, creator = false) {
     };
     game.start({
       stage, kit, mode: versus ? 'versus' : 'coop', weapons: versus ? [kit.weapon] : [kit.weapon, ...ownedWeapons().slice(1)],
-      lives: 3, etanks: 0, room: proom, hostile: versus, onPause: openPause,
+      lives: 3, etanks: 0, room: proom, hostile: versus, onPause: openPause, spawnIdx, spawnCount: order.length,
       onEnd: (kind, r) => {
         done();
         const msg = kind === 'versus' ? (r.win ? 'YOU WIN!' : 'YOU LOSE…') : kind === 'clear' ? 'MISSION COMPLETE' : 'GAME OVER';
@@ -598,9 +629,119 @@ function lobby(code, creator = false) {
   }
 }
 
+// ---------- offline versus (自分 + COM 最大3体) ----------
+const offline = { kit: null, coms: 1, diff: 'normal', comKits: [] };
+const OFF_DIFF = { easy: 'かんたん', normal: 'ふつう', hard: 'つよい' };
+function offlineRoster() {
+  return [...versusRoster(true), ...STAFF_KITS];
+}
+function rollComs() {
+  // 自分と被らないキャラをランダムに選ぶ（COM同士も重複なし）
+  const pool = offlineRoster().filter(k => k.id !== offline.kit);
+  const pick = [];
+  while (pick.length < offline.coms && pool.length) {
+    pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].id);
+  }
+  offline.comKits = pick;
+}
+function offlineMenu() {
+  const roster = offlineRoster();
+  if (offline.comKits.length !== offline.coms || offline.comKits.includes(offline.kit)) {
+    rollComs();
+  }
+  const coms = offline.comKits.map((id, i) => `<div>COM${i + 1}：${esc(findKit(id).name)}</div>`).join('');
+  show(`<h2>オフライン対戦</h2>
+    <div class="panel col">
+      <div class="row">人数 ${[1, 2, 3].map(n => `<button class="btn small ${offline.coms === n ? 'sel' : ''}" data-act="n:${n}">${n + 1}人</button>`).join('')}</div>
+      <div class="row">COMの強さ ${Object.entries(OFF_DIFF).map(([k, l]) => `<button class="btn small ${offline.diff === k ? 'sel' : ''}" data-act="d:${k}">${l}</button>`).join('')}</div>
+      <div class="sub" style="text-align:left">あなた：${offline.kit ? esc(findKit(offline.kit).name) : '選択してください'}${coms}</div>
+      <div class="row">${btn('roll', 'COMを再抽選', 'style="min-width:0"')}</div>
+      <div class="sub">ステージ：バトルアリーナ（3KO先取）</div>
+    </div>
+    <div class="rgrid">${roster.map(k => `<div class="rcell ${offline.kit === k.id ? 'sel' : ''}" data-act="k:${k.id}"><img src="${k.portrait}" alt="${k.name}" loading="lazy"><div>${k.name}</div></div>`).join('')}</div>
+    <div class="row">${btn('start', 'スタート', offline.kit ? '' : 'disabled')}${btn('back', '戻る')}</div>`, {
+    back: menu,
+    on: act => {
+      if (act === 'back') {
+        menu();
+      } else if (act === 'roll') {
+        rollComs();
+        offlineMenu();
+      } else if (act.startsWith('n:')) {
+        offline.coms = Math.max(1, Math.min(3, +act.slice(2) || 1));
+        rollComs();
+        offlineMenu();
+      } else if (act.startsWith('d:')) {
+        offline.diff = OFF_DIFF[act.slice(2)] ? act.slice(2) : 'normal';
+        offlineMenu();
+      } else if (act.startsWith('k:')) {
+        const id = act.slice(2);
+        if (roster.some(k => k.id === id)) {
+          offline.kit = id;
+          offlineMenu();
+        }
+      } else if (act === 'start' && offline.kit) {
+        startOffline();
+      }
+    },
+  });
+}
+function startOffline() {
+  const kit = findKit(offline.kit);
+  const comKits = offline.comKits.map(findKit);
+  const room = new LocalRoom(comKits.map(k => ({ kit: k })), offline.diff, comKits.length + 1);
+  exitStage = () => {
+    room.leave();
+    offlineMenu();
+  };
+  clearScreen();
+  game.start({
+    stage: ARENA_STAGE, kit, mode: 'versus', weapons: kit.weapons ? [...kit.weapons] : [kit.weapon], lives: 3, etanks: 0,
+    room, hostile: true, onPause: openPause, spawnIdx: 0, spawnCount: comKits.length + 1,
+    onEnd: (kind, r) => {
+      room.leave();
+      game.stop();
+      show(`<h1 class="logo">${r.win ? 'YOU WIN!' : 'YOU LOSE…'}</h1>${btn('again', 'もう一度')}${btn('ok', 'オフラインメニューへ')}`, {
+        lock: 1000,
+        on: act => (act === 'again' ? startOffline() : offlineMenu()),
+      });
+    },
+  });
+}
+
 // ---------- operator invasion ----------
 const ALL_STAGES = [INTRO_STAGE, ...STAGES, ...FINAL_STAGES];
+let invaderKit = null;
+function invaderChoices() {
+  return [...(save.operator ? [{ ...OVERLORD_KIT, weapons: OPERATOR_WEAPONS }] : []), ...STAFF_KITS];
+}
+function invadePick() {
+  if (!canInvade()) {
+    menu();
+    return;
+  }
+  const list = invaderChoices();
+  show(`<h2 style="color:#ff4a5a">侵入キャラ選択</h2><div class="cards">${list.map((k, i) => `<button class="btn card" data-act="k:${i}"><img src="${k.portrait}" alt="${k.name}" loading="lazy" style="object-fit:contain"><b>${k.name}</b><div class="sub">${k.desc}</div><div class="sub">HP ${k.hp}</div></button>`).join('')}</div>${btn('back', '戻る')}`, {
+    back: menu,
+    on: act => {
+      if (act === 'back') {
+        menu();
+        return;
+      }
+      const k = list[+act.slice(2)];
+      if (k) {
+        invaderKit = k;
+        invadeScreen();
+      }
+    },
+  });
+}
 function invadeScreen() {
+  // 権限と選択キャラを毎回再確認（選択肢外のキャラは使えない）
+  if (!canInvade() || !invaderKit || !invaderChoices().some(k => k.id === invaderKit.id)) {
+    invadePick();
+    return;
+  }
   const h = getHub();
   if (!h) {
     ui.toast('接続できませんでした', 2);
@@ -608,11 +749,11 @@ function invadeScreen() {
     return;
   }
   h.presence({ inGame: false, operator: true });
-  show(`<h2 style="color:#ff4a5a">⚠ 侵入モード</h2><div class="panel col"><div class="sub">プレイ中のソロプレイヤーを選んで乱入します</div><div id="tg" class="col"></div>${btn('back', '戻る')}</div>`, {
-    back: menu,
+  show(`<h2 style="color:#ff4a5a">⚠ 侵入モード</h2><div class="panel col"><div class="sub">${esc(invaderKit.name)} でプレイ中のソロプレイヤーに乱入します</div><div id="tg" class="col"></div>${btn('back', '戻る')}</div>`, {
+    back: invadePick,
     on: act => {
       if (act === 'back') {
-        menu();
+        invadePick();
         return;
       }
       const pid = act.slice(2);
@@ -625,7 +766,7 @@ function invadeScreen() {
       exitStage = invadeScreen;
       clearScreen();
       game.start({
-        stage: st, kit: { ...OVERLORD_KIT }, mode: 'invader', weapons: ['spikebomb', 'boomerang', 'quake', 'spark', 'fire'], lives: 0, etanks: 0,
+        stage: st, kit: { ...invaderKit }, mode: 'invader', weapons: [...invaderKit.weapons], lives: 0, etanks: 0,
         room: h, hostile: true, targetPid: pid, onPause: openPause,
         onEnd: (kind, r) => {
           game.stop();
