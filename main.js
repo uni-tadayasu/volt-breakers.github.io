@@ -11,6 +11,8 @@ import { Room, myId, preloadNet } from './net.js';
 import { ui, show, btn, cutscene, clearScreen, addCleanup, setupTouch, touchPref, applyTouch } from './screens.js';
 
 const $ = s => document.querySelector(s);
+// XSS対策：外部（ネットワーク）由来の文字列はHTMLエスケープしてから表示
+const esc = v => String(v).slice(0, 40).replace(/[&<>"'`]/g, c => `&#${c.charCodeAt(0)};`);
 const OP_KEY = 'OVERLORD-ADMIN';
 const BG = img => `background-image:linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.7)),url('${img}')`;
 
@@ -18,7 +20,26 @@ const BG = img => `background-image:linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.
 const DEFAULTS = { hero: 0, cleared: 0, hidden: 0, etanks: 0, intro: false, bgm: 0.55, sfx: 0.8, touch: 'auto', operator: false };
 let save;
 try {
-  save = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('nih-save') || '{}') };
+  const raw = JSON.parse(localStorage.getItem('nih-save') || '{}');
+  save = { ...DEFAULTS };
+  // 改ざん・破損対策：既知キーのみ、型と範囲を検証して取り込む（プロトタイプ汚染も防止）
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const int = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : undefined);
+    const vol = v => (typeof v === 'number' && v >= 0 && v <= 1 ? v : undefined);
+    const chk = {
+      hero: v => int(v, 0, 1), cleared: v => int(v, 0, 255), hidden: v => int(v, 0, 7), etanks: v => int(v, 0, 9), parts: v => int(v, 0, 15),
+      intro: v => (typeof v === 'boolean' ? v : undefined), bgm: vol, sfx: vol,
+      touch: v => (['auto', 'on', 'off'].includes(v) ? v : undefined), operator: v => (typeof v === 'boolean' ? v : undefined),
+    };
+    for (const k of Object.keys(chk)) {
+      if (Object.prototype.hasOwnProperty.call(raw, k)) {
+        const v = chk[k](raw[k]);
+        if (v !== undefined) {
+          save[k] = v;
+        }
+      }
+    }
+  }
 } catch (e) {
   save = { ...DEFAULTS };
 }
@@ -422,11 +443,14 @@ function onlineMenu() {
         menu();
         return;
       }
-      let code = $('#code').value.trim().toUpperCase().replace(/[^0-9A-Z]/g, '');
-      if (act === 'rand' || !code) {
-        code = Math.random().toString(36).slice(2, 7).toUpperCase();
+      let code = $('#code').value.trim().toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 5);
+      const create = act === 'rand' || !code;
+      if (create) {
+        // 推測されにくい安全な乱数でルームコードを生成
+        const A = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+        code = [...crypto.getRandomValues(new Uint8Array(5))].map(b => A[b % A.length]).join('');
       }
-      lobby(code);
+      lobby(code, create);
     },
   });
   root.querySelector('#code').focus();
@@ -435,7 +459,7 @@ function onlineMenu() {
 const MODES = { coop: { label: '協力 2人', max: 2 }, vs2: { label: '対戦 2人', max: 2 }, vs4: { label: '対戦 4人', max: 4 } };
 const COOP_STAGES = [INTRO_STAGE, ...STAGES];
 
-function lobby(code) {
+function lobby(code, creator = false) {
   let room;
   try {
     room = new Room('lobby-' + code);
@@ -444,7 +468,8 @@ function lobby(code) {
     onlineMenu();
     return;
   }
-  const me = { lobby: true, kit: null, mode: 'coop', stage: 0, ready: true };
+  // ホスト判定用：ルーム作成者フラグと入室時刻
+  const me = { lobby: true, kit: null, mode: 'coop', stage: 0, ready: true, creator: !!creator, joined: Date.now() };
   let launched = false;
   const leave = () => {
     room.leave();
@@ -478,7 +503,21 @@ function lobby(code) {
   });
   function state() {
     const peers = room.peers;
-    const members = [myId, ...Object.keys(peers)].sort();
+    // 並び順：ルーム作成者 → 入室の早い順 → ID（同時刻のみ）。先頭がホスト
+    const info = id => (id === myId ? me : peers[id] || {});
+    const members = [myId, ...Object.keys(peers)].sort((a, b) => {
+      const A = info(a);
+      const B = info(b);
+      if (!!A.creator !== !!B.creator) {
+        return A.creator ? -1 : 1;
+      }
+      const ja = A.joined || Infinity;
+      const jb = B.joined || Infinity;
+      if (ja !== jb) {
+        return ja - jb;
+      }
+      return a < b ? -1 : a > b ? 1 : 0;
+    });
     const host = members[0] === myId;
     const hp = host ? me : peers[members[0]] || me;
     const mode = MODES[hp.mode] ? hp.mode : 'coop';
@@ -516,7 +555,14 @@ function lobby(code) {
       <div class="row">${s.host ? btn('start', 'スタート', s.canStart ? '' : 'disabled') : '<div class="sub">ホストの開始を待っています…</div>'}${btn('back', '退出')}</div>`;
   }
   const unPeers = room.onPeers(render);
-  room.on('start', e => launch(e));
+  room.on('start', e => {
+    // ホスト以外からの開始指示・不正な値は無視
+    const s = state();
+    if (!e || e.from !== s.members[0] || !MODES[e.mode] || !Number.isInteger(e.stage) || e.stage < 0 || e.stage >= COOP_STAGES.length || !Number.isFinite(e.t)) {
+      return;
+    }
+    launch(e);
+  });
   addCleanup(() => unPeers());
   room.presence(me);
   render();
@@ -595,7 +641,7 @@ function invadeScreen() {
     }
     const list = Object.values(peers).filter(p => p.inGame && p.mode === 'solo');
     el.innerHTML = list.length
-      ? list.map(p => `<button class="btn" data-act="i:${p.pid}">${p.name || '???'} ─ ${(ALL_STAGES.find(s => s.id === p.stage) || {}).name || p.stage}</button>`).join('')
+      ? list.filter(p => typeof p.pid === 'string' && /^[0-9a-f-]{8,64}$/i.test(p.pid)).map(p => `<button class="btn" data-act="i:${esc(p.pid)}">${esc(p.name || '???')} ─ ${esc((ALL_STAGES.find(s => s.id === p.stage) || {}).name || '???')}</button>`).join('')
       : '<div class="sub">現在プレイ中のプレイヤーはいません…</div>';
   };
   const un = h.onPeers(render);

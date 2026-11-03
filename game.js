@@ -6,6 +6,10 @@ import { play, playMusic, setTrack } from './audio.js';
 import { makeModel, playAnim, getTexture, ensureModel, hasModel } from './assets.js';
 
 const DEFERRED_MODELS = ['overlord', 'vb-operator-brute'];
+// ネットワークから受け付ける弾種／モデル名のホワイトリスト
+const SHOT_TYPES = new Set(['buster', 'slash', 'wave', 'fire', 'ice', 'homing', 'spark', 'quake', 'boomerang', 'laser', 'spread', 'spikebomb']);
+const NET_MODELS = new Set(['vb-hero-van', 'vb-hero-rei', 'enemy-walker', 'boss-mech', ...DEFERRED_MODELS]);
+const num = (v, lo, hi, d) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
 import { myId } from './net.js';
 
 // オンライン同期の版番号（見た目・技の仕様を変えたら上げる）
@@ -3536,10 +3540,25 @@ export class Game {
 
   // ---------------- networking ----------------
   attachNet(room, { hostile = false, only = null, quiet = false } = {}) {
-    this.net = { room, hostile, only, quiet, ghosts: {}, sendT: 0, unsubs: [], targetSeen: false, lostT: 0 };
+    this.net = { room, hostile, only, quiet, ghosts: {}, sendT: 0, unsubs: [], targetSeen: false, lostT: 0, rate: {} };
     const n = this.net;
     n.unsubs.push(room.on('shot', e => {
       if (!this.running || e.stage !== this.stage.id || n.only && e.from !== n.only) {
+        return;
+      }
+      // 不正データ対策：弾種・座標・段階を検証し、連射しすぎる送信元は間引く
+      if (!SHOT_TYPES.has(e.type) || !Number.isFinite(e.x) || !Number.isFinite(e.y) || Math.abs(e.x) > 5000 || Math.abs(e.y) > 5000) {
+        return;
+      }
+      e.dir = e.dir < 0 ? -1 : 1;
+      e.level = Math.max(0, Math.min(2, e.level | 0));
+      const now = performance.now();
+      const rl = n.rate[e.from] || (n.rate[e.from] = { t: now, c: 0 });
+      if (now - rl.t > 1000) {
+        rl.t = now;
+        rl.c = 0;
+      }
+      if (++rl.c > 30) {
         return;
       }
       const sh = this.spawnShot(n.hostile ? 'foe' : 'ally', e.type, e.x, e.y, e.dir, e.level, e.from);
@@ -3550,7 +3569,8 @@ export class Game {
     n.hpOf = {};
     n.unsubs.push(room.on('hp', e => {
       if (e && e.from && typeof e.hp === 'number' && (!e.stage || !this.stage || e.stage === this.stage.id)) {
-        n.hpOf[e.from] = { hp: e.hp, max: e.max || 1, name: e.name, t: performance.now() };
+        const max = num(e.max, 1, 200, 28);
+        n.hpOf[e.from] = { hp: num(e.hp, 0, max, 0), max, name: String(e.name || '').slice(0, 24), t: performance.now() };
       }
     }));
     n.unsubs.push(room.on('ko', e => this.onKO(e)));
@@ -3629,10 +3649,16 @@ export class Game {
     }
   }
 
-  // 対戦相手（侵入者／ターゲット）のHPパネル（ボスバーとは独立したDOM）
-  drawRivalHP(r, label = '') {
+  // 他プレイヤーのHPパネル（人数分の行・ボスバーとは独立したDOM／textContentのみ使用）
+  drawRivalHP(rows, label = '') {
+    // 軽量化：内容が変わらないフレームはDOMに触れない
+    const sig = rows && rows.length ? label + rows.map(r => `${r.name}:${Math.round(r.hp)}/${r.max}`).join('|') : '';
+    if (sig === this._rivSig) {
+      return;
+    }
+    this._rivSig = sig;
     let el = document.getElementById('rivalhp');
-    if (!r) {
+    if (!rows || !rows.length) {
       if (el) el.style.display = 'none';
       return;
     }
@@ -3640,18 +3666,40 @@ export class Game {
       el = document.createElement('div');
       el.id = 'rivalhp';
       el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 10px);z-index:30;pointer-events:none;'
-        + 'min-width:220px;width:42vw;max-width:420px;padding:5px 10px 7px;background:rgba(20,6,10,.78);border:2px solid #ff4a5a;border-radius:6px;'
-        + 'box-shadow:0 0 12px rgba(255,60,80,.5);font:13px "DotGothic16",sans-serif;color:#ffe8ea;text-shadow:1px 1px 0 #000;';
-      el.innerHTML = '<div class="rn" style="display:flex;justify-content:space-between;margin-bottom:3px"><span class="rl"></span><span class="rv"></span></div>'
-        + '<div style="height:10px;background:#2a0a10;border:1px solid #000"><i style="display:block;height:100%;width:100%;background:linear-gradient(#ff8a96,#d0182c);transition:width .15s"></i></div>';
+        + 'min-width:200px;width:40vw;max-width:400px;display:flex;flex-direction:column;gap:4px;font:12px "DotGothic16",sans-serif;color:#ffe8ea;text-shadow:1px 1px 0 #000;';
       (document.getElementById('game-container') || document.body).appendChild(el);
     }
-    el.style.display = 'block';
-    const max = Math.max(1, r.max || 1);
-    const hp = Math.max(0, Math.min(max, r.hp));
-    el.querySelector('.rl').textContent = `${label} ${r.name || ''}`;
-    el.querySelector('.rv').textContent = `HP ${hp}/${max}`;
-    el.querySelector('i').style.width = `${(hp / max) * 100}%`;
+    const ally = label === '味方';
+    while (el.children.length < rows.length) {
+      const row = document.createElement('div');
+      row.style.cssText = 'padding:3px 8px 5px;background:rgba(10,8,16,.75);border:2px solid;border-radius:6px;';
+      const head = document.createElement('div');
+      head.style.cssText = 'display:flex;justify-content:space-between;margin-bottom:2px';
+      head.append(document.createElement('span'), document.createElement('span'));
+      const bar = document.createElement('div');
+      bar.style.cssText = 'height:8px;background:#1a0a10;border:1px solid #000';
+      const fill = document.createElement('i');
+      fill.style.cssText = 'display:block;height:100%;transition:width .15s';
+      bar.append(fill);
+      row.append(head, bar);
+      el.append(row);
+    }
+    while (el.children.length > rows.length) {
+      el.lastChild.remove();
+    }
+    rows.forEach((r, i) => {
+      const row = el.children[i];
+      const max = Math.max(1, r.max || 1);
+      const hp = Math.max(0, Math.min(max, Math.round(r.hp)));
+      row.style.borderColor = ally ? '#4fc8ff' : '#ff4a5a';
+      const [l, v] = row.firstChild.children;
+      l.textContent = `${label} ${r.name || ''}`;
+      v.textContent = `HP ${hp}/${max}`;
+      const f = row.lastChild.firstChild;
+      f.style.width = `${(hp / max) * 100}%`;
+      f.style.background = ally ? 'linear-gradient(#9ee4ff,#1c8ad0)' : 'linear-gradient(#ff8a96,#d0182c)';
+    });
+    el.style.display = 'flex';
   }
 
   updateNet(dt) {
@@ -3697,15 +3745,16 @@ export class Game {
       }
       if (!gh) {
         let kit = findKit(pr.kit);
-        if (pr.km) {
-          // 送信側の外見情報を優先（ローカルに無いキャラ・旧版データでも正しく表示）
-          kit = { ...(kit.id === pr.kit ? kit : {}), id: pr.kit, name: pr.name || kit.name, model: pr.km, height: pr.kh || 1.75, tint: pr.kt ?? undefined, emissive: pr.ke ?? undefined, flail: !!pr.kf };
+        if (pr.km && NET_MODELS.has(pr.km)) {
+          // 送信側の外見情報を優先（値は検証・範囲制限して使用）
+          kit = { ...(kit.id === pr.kit ? kit : {}), id: String(pr.kit).slice(0, 32), name: String(pr.name || kit.name).slice(0, 24), model: pr.km, height: num(pr.kh, 0.8, 4, 1.75), tint: Number.isFinite(pr.kt) ? pr.kt : undefined, emissive: Number.isFinite(pr.ke) ? pr.ke : undefined, flail: !!pr.kf };
         }
         gh = { pid, look, kitId: pr.kit, kit, rig: this.makeRig(kit), x: pr.x, y: pr.y, tx: pr.x, ty: pr.y, w: kit.flail ? 1.1 : 0.8, h: kit.height || 1.7, dir: 1, anim: 'idle', visible: true };
         n.ghosts[pid] = gh;
       }
-      gh.tx = pr.x;
-      gh.ty = pr.y;
+      gh.tx = num(pr.x, -5000, 5000, gh.tx);
+      gh.ty = num(pr.y, -5000, 5000, gh.ty);
+      gh.name = String(pr.name || gh.kit.name || '').slice(0, 24);
       gh.dir = pr.dir;
       gh.anim = pr.anim || 'idle';
       gh.visible = !pr.dead;
@@ -3719,22 +3768,34 @@ export class Game {
     // 侵入戦のHP共有：専用トピックで送信（変化時＋0.5秒ごと）し、相手のHPを専用パネルに表示
     const hv = Math.max(0, Math.round(p.hp));
     n.hpT = (n.hpT || 0) - dt;
-    if (n.only && n.only !== '__none__' && (hv !== n.lastHp || n.hpT <= 0)) {
+    const invading = n.only && n.only !== '__none__';
+    const online = this.mode === 'coop' || this.mode === 'versus';
+    if ((invading || online) && (hv !== n.lastHp || n.hpT <= 0)) {
       n.lastHp = hv;
       n.hpT = 0.5;
       n.room.emit('hp', { hp: hv, max: p.max, name: p.kit.name, stage: this.stage.id });
     }
-    let rival = null;
-    if (n.only && n.only !== '__none__') {
-      const ev = n.hpOf && n.hpOf[n.only];
-      const pr = peers[n.only];
+    // 表示対象：侵入戦は相手1人、協力・対戦は同じステージの全プレイヤー
+    const ids = invading ? [n.only] : online ? Object.keys(n.ghosts) : [];
+    const rows = [];
+    for (const id of ids) {
+      const ev = n.hpOf && n.hpOf[id];
+      const pr = peers[id];
+      const gh = n.ghosts[id];
+      let r = null;
       if (ev && performance.now() - ev.t < 4000) {
-        rival = ev;
-      } else if (pr && typeof pr.hp === 'number' && pr.stage === this.stage.id) {
-        rival = { hp: pr.hp, max: pr.max, name: pr.name };
+        r = { ...ev };
+      } else if (pr && Number.isFinite(pr.hp) && pr.stage === this.stage.id) {
+        const max = num(pr.max, 1, 200, 28);
+        r = { hp: num(pr.hp, 0, max, 0), max, name: String(pr.name || '').slice(0, 24) };
+      }
+      if (r) {
+        r.name = r.name || (gh && gh.name) || '';
+        rows.push(r);
       }
     }
-    this.drawRivalHP(rival, this.mode === 'invader' ? 'ターゲット' : '侵入者');
+    const label = this.mode === 'invader' ? 'ターゲット' : invading ? '侵入者' : this.mode === 'versus' ? '相手' : '味方';
+    this.drawRivalHP(rows, label);
     if (this.mode === 'invader') {
       const tg = n.ghosts[n.only];
       if (tg && !n.targetSeen) {

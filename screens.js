@@ -10,13 +10,35 @@ export const touchPref = { mode: 'auto' };
 const hudState = { wname: '', lives: 2, tanks: 0 };
 let bannerTimer = 0;
 let toastTimer = 0;
+// 軽量化：要素参照と最終値をキャッシュし、値が変わった時だけDOMを書き換える
+const elCache = {};
+const q = sel => elCache[sel] || (elCache[sel] = $(sel));
+const last = {};
+function put(key, el, prop, val, style = true) {
+  if (last[key] === val || !el) {
+    return;
+  }
+  last[key] = val;
+  if (style) {
+    el.style[prop] = val;
+  } else {
+    el[prop] = val;
+  }
+}
 function setBar(sel, frac) {
   const f = Math.max(0, Math.min(1, frac || 0));
-  $(sel + ' i').style.height = `calc(${(f * 100).toFixed(1)}% - ${f > 0 ? 4 : 0}px)`;
+  put(sel + 'h', q(sel + ' i'), 'height', `calc(${(f * 100).toFixed(1)}% - ${f > 0 ? 4 : 0}px)`);
 }
 function hudInfo() {
   const lives = hudState.lives === null ? '' : `残機 ×${Math.max(0, hudState.lives)}　`;
-  $('#hudinfo').innerHTML = `${hudState.wname}<br>${lives}セル ${hudState.tanks}`;
+  const el = q('#hudinfo');
+  const key = `${hudState.wname}\n${lives}セル ${hudState.tanks}`;
+  if (last.info === key || !el) {
+    return;
+  }
+  last.info = key;
+  el.textContent = '';
+  el.append(String(hudState.wname), document.createElement('br'), `${lives}セル ${hudState.tanks}`);
 }
 
 export function applyTouch() {
@@ -36,19 +58,19 @@ export const ui = {
   setWeapon(name, color, en, max, free) {
     hudState.wname = name;
     const c = '#' + color.toString(16).padStart(6, '0');
-    $('#wpbar').style.display = free ? 'none' : 'block';
-    $('#wpbar i').style.background = c;
+    put('wpd', q('#wpbar'), 'display', free ? 'none' : 'block');
+    put('wpc', q('#wpbar i'), 'background', c);
     setBar('#wpbar', en / max);
-    $('#hudinfo').style.borderLeft = `4px solid ${c}`;
+    put('hib', q('#hudinfo'), 'borderLeft', `4px solid ${c}`);
     hudInfo();
   },
   setBoss(v, m, name) {
     const on = !!name;
-    $('#bossbar').style.display = on ? 'block' : 'none';
-    $('#bossname').style.display = on ? 'block' : 'none';
+    put('bbd', q('#bossbar'), 'display', on ? 'block' : 'none');
+    put('bnd', q('#bossname'), 'display', on ? 'block' : 'none');
     if (on) {
       setBar('#bossbar', v / m);
-      $('#bossname').textContent = name;
+      put('bnt', q('#bossname'), 'textContent', String(name), false);
     }
   },
   setLives(n) {
