@@ -3593,9 +3593,18 @@ export class Game {
       }
       seen.add(pid);
       let gh = n.ghosts[pid];
+      if (!pr.kit) {
+        continue;
+      }
+      if (gh && gh.kitId !== pr.kit) {
+        // 古いプレゼンス（前回のキャラ）で作られたゴーストを作り直す
+        this.world.remove(gh.rig.group);
+        delete n.ghosts[pid];
+        gh = null;
+      }
       if (!gh) {
         const kit = findKit(pr.kit);
-        gh = { pid, rig: this.makeRig(kit), x: pr.x, y: pr.y, tx: pr.x, ty: pr.y, w: 0.8, h: 1.7, dir: 1, anim: 'idle', visible: true };
+        gh = { pid, kitId: pr.kit, kit, rig: this.makeRig(kit), x: pr.x, y: pr.y, tx: pr.x, ty: pr.y, w: kit.flail ? 1.1 : 0.8, h: kit.height || 1.7, dir: 1, anim: 'idle', visible: true };
         n.ghosts[pid] = gh;
       }
       gh.tx = pr.x;
