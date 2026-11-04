@@ -51,6 +51,8 @@ let currentTrack = 'main';
 export function setTrack(name) {
   const key = TRACKS[name] ? name : 'main';
   if (key === currentTrack) {
+    // 同じ曲でも止まっていたら先頭から再開できるようにする
+    if (music.paused && music.src) music.currentTime = 0;
     return;
   }
   currentTrack = key;

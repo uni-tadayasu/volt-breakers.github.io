@@ -506,8 +506,14 @@ export class Game {
     this.stageTrack = st.id === 'intro' || st.id === 'f4' ? 'hero' : 'main';
     setTrack(this.stageTrack);
     playMusic(1);
-    if (this.player && this.player.kit && this.player.kit.id === 'opkuge') {
-      this.kugeEntrance();
+    // 麻呂ノ宮で出撃したら出現テーマ（開始処理の後に流して上書きされないようにする）
+    this.kugeAt = 0;
+    this.kugeToken = (this.kugeToken || 0) + 1;
+    const isKuge = k => !!k && (k.id === 'opkuge' || k.model === 'vb-op-kuge' || k.homingSlash);
+    if (isKuge(cfg.kit) || isKuge(this.player && this.player.kit)) {
+      setTimeout(() => {
+        if (this.running && !this.ended) this.kugeEntrance();
+      }, 300);
     }
     this.ui.banner(st.name, 'stage', 1.5);
     setTimeout(() => {
@@ -4194,7 +4200,7 @@ export class Game {
         }
         gh = { pid, look, kitId: pr.kit, kit, rig: this.makeRig(kit), x: pr.x, y: pr.y, tx: pr.x, ty: pr.y, w: kit.flail ? 1.1 : 0.8, h: kit.height || 1.7, dir: 1, anim: 'idle', visible: true };
         n.ghosts[pid] = gh;
-        if (gh.kitId === 'opkuge') {
+        if (gh.kitId === 'opkuge' || kit.model === 'vb-op-kuge') {
           this.kugeEntrance(); // 相手が麻呂ノ宮なら出現テーマ
         }
       }
