@@ -1313,7 +1313,9 @@ export class Game {
   handleWeapon(p, dt) {
     const w = p.weapons[0];
     if (input.wasPressed('special')) {
-      if (p.weapons.length > 1 && p.wi > 0) {
+      if (p.kit.eyeBeam && !(p.weapons.length > 1 && p.wi > 0)) {
+        this.eyeBeam(p);
+      } else if (p.weapons.length > 1 && p.wi > 0) {
         if (p.shootT <= 0) {
           this.fire(p, p.weapons[p.wi], 0, p.wi);
         }
@@ -1455,6 +1457,28 @@ export class Game {
       this.particles.emit(x, y, 0x66ff88, 10, { ring: true, speed: 5, life: 0.3, size: 0.5 });
       play('zap');
     }
+  }
+
+  // 麻呂ノ宮：目から赤い光線ビーム（2本並走・貫通）
+  eyeBeam(p) {
+    if (p.eyeCd > this.time) {
+      return;
+    }
+    p.eyeCd = this.time + 0.7;
+    p.shootT = 0.2;
+    p.shootAnim = 0.3;
+    const x = p.x + p.dir * 0.35;
+    const yEye = p.y + p.h * 0.86;
+    for (const dy of [0.06, -0.06]) {
+      const sh = this.spawnShot('ally', 'laser', x, yEye + dy, p.dir, 1, myId, { color: 0xff1a1a });
+      sh.dmg = 2.5;
+      sh.pierce = true;
+      this.emitShot('laser', x, yEye + dy, p.dir, 1, undefined, { col: 0xff1a1a });
+    }
+    this.particles.emit(x, yEye, 0xff3030, 10, { ring: true, speed: 3, life: 0.25, size: 0.4 });
+    this.particles.emit(x, yEye, 0xffffff, 4, { speed: 1, life: 0.15, size: 0.3 });
+    this.shake(0.05);
+    play('zap');
   }
 
   slash(p) {

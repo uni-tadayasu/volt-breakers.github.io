@@ -184,6 +184,12 @@ export class LocalRoom {
     const ex = {};
     if (type === 'buster' && b.kit.shotColor) ex.col = b.kit.shotColor[level] || b.kit.shotColor[0];
     this.fire('shot', { type, x, y, dir: b.dir, level, stage: game.stage.id, from: b.id, ...ex });
+    if (type === 'wave' && b.kit.eyeBeam && Math.random() < 0.5) {
+      // 麻呂ノ宮COM：遠距離では目から赤い光線
+      for (const dy of [0.06, -0.06]) {
+        this.fire('shot', { type: 'laser', x: b.x + b.dir * 0.35, y: b.y + b.h * 0.86 + dy, dir: b.dir, level: 1, stage: game.stage.id, from: b.id, col: 0xff1a1a });
+      }
+    }
     if (type === 'slash' && b.kit.homingSlash) {
       // 草薙の剣：COMも追尾斬撃を放つ
       this.fire('shot', { type: 'wave', x, y, dir: b.dir, level: 0, stage: game.stage.id, from: b.id, col: 0x66ccff, hom: 1 });

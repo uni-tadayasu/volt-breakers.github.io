@@ -168,8 +168,8 @@ export const OPERATOR_SAGE_KIT = {
 // 運営長専用キャラ3：公家剣士「麻呂ノ宮」— 草薙の剣（青く光る刀の3連斬り＋斬撃波）
 export const OPERATOR_KUGE_KIT = {
   id: 'opkuge', name: '麻呂ノ宮', model: 'vb-op-kuge', height: 1.85, weapon: 'saber', color: 0x66ccff, hp: 40,
-  portrait: 'assets/vb-p-opkuge.webp', desc: '草薙の剣：振るたび追尾斬撃が飛ぶ。攻撃していない時の被弾を三つ葉葵の紋で吸収し回復（運営長専用）',
-  homingSlash: true, aoiAbsorb: true, absorb: true, operatorOnly: true,
+  portrait: 'assets/vb-p-opkuge.webp', desc: '草薙の剣：振るたび追尾斬撃が飛ぶ。特殊ボタンで目から赤い光線。攻撃していない時の被弾を三つ葉葵の紋で吸収し回復（運営長専用）',
+  homingSlash: true, eyeBeam: true, aoiAbsorb: true, absorb: true, operatorOnly: true,
 };
 export const OPERATOR_WEAPONS = ['spikebomb', 'boomerang', 'quake', 'spark', 'fire'];
 
