@@ -19,7 +19,7 @@ const num = (v, lo, hi, d) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)
 import { myId } from './net.js';
 
 // オンライン同期の版番号（見た目・技の仕様を変えたら上げる）
-export const NET_VER = 23;
+export const NET_VER = 24;
 // アリーナの初期位置：人数に応じて均等に配置（障害物の柱 ±15.6〜17 を避けた座標）
 const ARENA_SLOTS = { 1: [0], 2: [-12, 12], 3: [-18, 0, 18], 4: [-18, -6, 6, 18] };
 export function arenaSpawnX(i, n) {
@@ -2270,7 +2270,10 @@ export class Game {
   nearestTarget(sh) {
     let best = null;
     let bd = 1e9;
-    const list = sh.team === 'ally' ? [...this.enemies, ...this.bosses] : [this.player];
+    // 対戦・侵入では相手プレイヤー（ゴースト）も追尾対象にする（自分の画面でも相手を追う）
+    const foes = sh.team === 'ally' && this.net && (this.net.hostile || this.mode === 'versus')
+      ? Object.values(this.net.ghosts).filter(g => g.visible) : [];
+    const list = sh.team === 'ally' ? [...this.enemies, ...this.bosses, ...foes] : [this.player];
     for (const t of list) {
       if (t.dead || t.dying) {
         continue;
