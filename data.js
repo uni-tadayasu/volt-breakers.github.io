@@ -165,6 +165,12 @@ export const OPERATOR_SAGE_KIT = {
   portrait: 'assets/vb-p-opsage.webp', desc: '緑の三連光線。攻撃していない時の被弾をバリアで吸収し回復（運営専用）',
   triShot: true, absorb: true, operatorOnly: true,
 };
+// 運営長専用キャラ3：公家剣士「麻呂ノ宮」— 草薙の剣（青く光る刀の3連斬り＋斬撃波）
+export const OPERATOR_KUGE_KIT = {
+  id: 'opkuge', name: '麻呂ノ宮', model: 'vb-op-kuge', height: 1.85, weapon: 'saber', color: 0x66ccff, hp: 40,
+  portrait: 'assets/vb-p-opkuge.webp', desc: '草薙の剣で相手を斬り伏せる公家剣士（運営長専用）',
+  operatorOnly: true,
+};
 export const OPERATOR_WEAPONS = ['spikebomb', 'boomerang', 'quake', 'spark', 'fire'];
 
 export function versusRoster(isOperator, hasPremium = isOperator) {
@@ -176,7 +182,7 @@ export function versusRoster(isOperator, hasPremium = isOperator) {
     bossKit(INTRO_BOSS), bossKit(GUARDIAN), bossKit(FUSED),
   ];
   if (isOperator) {
-    list.push(OVERLORD_KIT, OPERATOR_SAGE_KIT);
+    list.push(OVERLORD_KIT, OPERATOR_SAGE_KIT, OPERATOR_KUGE_KIT);
   }
   return list;
 }

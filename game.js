@@ -6,7 +6,7 @@ import { input } from './input.js';
 import { play, playMusic, setTrack } from './audio.js';
 import { makeModel, playAnim, getTexture, ensureModel, hasModel } from './assets.js';
 
-const DEFERRED_MODELS = ['vb-hero-carmine2', 'vb-op-sage', 'vb-operator-brute', 'vb-staff-hornet2', 'vb-staff-sage'];
+const DEFERRED_MODELS = ['vb-hero-carmine2', 'vb-op-sage', 'vb-op-kuge', 'vb-operator-brute', 'vb-staff-hornet2', 'vb-staff-sage'];
 // ネットワークから受け付ける弾種／モデル名のホワイトリスト
 export const SHOT_TYPES = new Set(['buster', 'slash', 'wave', 'fire', 'ice', 'homing', 'spark', 'quake', 'boomerang', 'laser', 'spread', 'spikebomb', 'cutter', 'mine', 'ray']);
 const BOSS_MODELS = [

@@ -5,7 +5,7 @@ import {
   heroKit, versusRoster, findKit, OVERLORD_KIT, STAFF_KITS, OPERATOR_WEAPONS, encodePassword, decodePassword,
 } from './data.js';
 import { isOperatorKey, isStaffKey, issueStaffKey, normKey, isPremiumCode, issuePremiumCode, PREMIUM_URL, newSyncCode, isSyncCode } from './keys.js';
-import { PREMIUM_HERO, OPERATOR_SAGE_KIT } from './data.js';
+import { PREMIUM_HERO, OPERATOR_SAGE_KIT, OPERATOR_KUGE_KIT } from './data.js';
 import { pushSync, pullSync } from './net.js';
 import { input } from './input.js';
 import { unlock, play, setVolumes, playMusic, stopMusic } from './audio.js';
@@ -813,7 +813,7 @@ function startOffline() {
 const ALL_STAGES = [INTRO_STAGE, ...STAGES, ...FINAL_STAGES];
 let invaderKit = null;
 function invaderChoices() {
-  return [...(save.operator ? [{ ...OVERLORD_KIT, weapons: OPERATOR_WEAPONS }, OPERATOR_SAGE_KIT] : []), ...STAFF_KITS];
+  return [...(save.operator ? [{ ...OVERLORD_KIT, weapons: OPERATOR_WEAPONS }, OPERATOR_SAGE_KIT, OPERATOR_KUGE_KIT] : []), ...STAFF_KITS];
 }
 function invadePick() {
   if (!canInvade()) {
