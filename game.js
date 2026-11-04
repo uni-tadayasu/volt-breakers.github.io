@@ -19,7 +19,7 @@ const num = (v, lo, hi, d) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)
 import { myId } from './net.js';
 
 // オンライン同期の版番号（見た目・技の仕様を変えたら上げる）
-export const NET_VER = 22;
+export const NET_VER = 23;
 // アリーナの初期位置：人数に応じて均等に配置（障害物の柱 ±15.6〜17 を避けた座標）
 const ARENA_SLOTS = { 1: [0], 2: [-12, 12], 3: [-18, 0, 18], 4: [-18, -6, 6, 18] };
 export function arenaSpawnX(i, n) {
@@ -506,6 +506,9 @@ export class Game {
     this.stageTrack = st.id === 'intro' || st.id === 'f4' ? 'hero' : 'main';
     setTrack(this.stageTrack);
     playMusic(1);
+    if (this.player && this.player.kit && this.player.kit.id === 'opkuge') {
+      this.kugeEntrance();
+    }
     this.ui.banner(st.name, 'stage', 1.5);
     setTimeout(() => {
       if (this.running && !this.ended) {
@@ -1386,9 +1389,10 @@ export class Game {
       }
       this.shake(0.1);
     }
-    this.spawnShot('ally', type, x, y, p.dir, level, myId, p.kit.shotColor && type === 'buster' ? { color: p.kit.shotColor[level] || p.kit.shotColor[0] } : {});
+    const sopt = p.kit.shotColor && type === 'buster' ? { color: p.kit.shotColor[level] || p.kit.shotColor[0] } : {};
+    this.spawnShot('ally', type, x, y, p.dir, level, myId, sopt);
     this.muzzleFx(type, x, y, p.dir, level);
-    this.emitShot(type, x, y, p.dir, level);
+    this.emitShot(type, x, y, p.dir, level, undefined, sopt.color != null ? { col: sopt.color } : null);
     play(type === 'buster' ? 'shot' : 'zap');
   }
 
@@ -1412,7 +1416,7 @@ export class Game {
     const sh = this.spawnShot('ally', 'ray', x, y, p.dir, 0, myId, { angle: a, color: 0x33ff77 });
     sh.dmg = lvl === 2 ? 3 : lvl === 1 ? 2 : 1.5;
     if (lvl) sh.pierce = true;
-    this.emitShot('ray', x, y, p.dir, 0, a);
+    this.emitShot('ray', x, y, p.dir, 0, a, { col: 0x33ff77 });
     this.muzzleFx('buster', x, y, p.dir, 0);
     p.shootT = 0.14;
     p.shootAnim = 0.3;
@@ -1461,6 +1465,16 @@ export class Game {
       this.shake(0.06);
     }
     this.emitShot('slash', x, y, p.dir, p.combo);
+    // 草薙の剣：振るたびに追尾する青い斬撃が飛ぶ
+    if (p.kit.homingSlash) {
+      const hs = this.spawnShot('ally', 'wave', x, y, p.dir, 0, myId, { color: 0x66ccff });
+      hs.beh = 'homing';
+      hs.life = 1.4;
+      hs.dmg = 1.5 + p.combo * 0.5;
+      hs.r = 0.55;
+      hs.faceVel = true;
+      this.emitShot('wave', x, y, p.dir, 0, undefined, { col: 0x66ccff, hom: true });
+    }
     play('slash');
   }
 
@@ -1470,12 +1484,19 @@ export class Game {
       return;
     }
     // 吸収バリア（運営専用キャラ）：攻撃していない時の被弾をバリアで受け、その分回復
-    if (p.kit.absorb && !(p.shootT > 0) && !(p.triQ > 0)) {
+    if (p.kit.absorb && !(p.shootT > 0) && !(p.triQ > 0) && !(p.slashT > 0)) {
       const heal = Math.round(dmg);
       p.hp = Math.min(p.max, p.hp + heal);
       p.inv = 0.6;
-      this.showBarrier(p, 0x33ff77);
-      this.particles.emit(p.x, p.y + 1, 0x66ff99, 14, { ring: true, speed: 4, life: 0.35, size: 0.5 });
+      const aoi = !!p.kit.aoiAbsorb;
+      if (aoi) {
+        this.showAoi(p);
+        this.emitFx('aoi');
+      } else {
+        this.showBarrier(p, 0x33ff77);
+        this.emitFx('barrier', 0x33ff77);
+      }
+      this.particles.emit(p.x, p.y + 1, aoi ? 0xffd166 : 0x66ff99, 14, { ring: true, speed: 4, life: 0.35, size: 0.5 });
       play('select');
       this.refreshHud();
       return;
@@ -1483,6 +1504,7 @@ export class Game {
     if (this.parts & 8) {
       dmg = Math.max(1, Math.ceil(dmg * 0.5));
       this.showBarrier(p);
+      this.emitFx('barrier');
     }
     p.hp -= Math.round(dmg);
     p.lastHitBy = by;
@@ -1496,6 +1518,56 @@ export class Game {
     if (p.hp <= 0) {
       this.killPlayer();
     }
+  }
+
+  // 三つ葉葵の骨組み（スケルトン）紋章エフェクト
+  showAoi(p) {
+    if (!p.aoi || !p.aoi.parent) {
+      const pts = [];
+      const seg = (a, b) => pts.push(a.x, a.y, 0, b.x, b.y, 0);
+      const V = (x, y) => new THREE.Vector2(x, y);
+      // 外円＋内円
+      for (const R of [1.25, 1.12]) {
+        for (let i = 0; i < 48; i++) {
+          const a0 = (i / 48) * Math.PI * 2, a1 = ((i + 1) / 48) * Math.PI * 2;
+          seg(V(Math.cos(a0) * R, Math.sin(a0) * R), V(Math.cos(a1) * R, Math.sin(a1) * R));
+        }
+      }
+      // 葵の葉（ハート形）を中心から120°ずつ3枚、葉脈つき
+      for (let k = 0; k < 3; k++) {
+        const rot = Math.PI / 2 + (k / 3) * Math.PI * 2;
+        const c = Math.cos(rot), s = Math.sin(rot);
+        const tf = (x, y) => V(x * c - y * s, x * s + y * c);
+        const leaf = [];
+        for (let i = 0; i <= 32; i++) {
+          const t = (i / 32) * Math.PI * 2;
+          // 先端が中心を向くハート曲線
+          const hx = 16 * Math.sin(t) ** 3;
+          const hy = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+          leaf.push(tf(hx * 0.028, 0.95 - (hy + 17) * 0.026));
+        }
+        for (let i = 0; i < leaf.length - 1; i++) seg(leaf[i], leaf[i + 1]);
+        // 主脈と側脈
+        seg(tf(0, 0.08), tf(0, 0.92));
+        for (let j = 1; j <= 3; j++) {
+          const y = 0.2 + j * 0.17;
+          seg(tf(0, y), tf(0.2, y + 0.14));
+          seg(tf(0, y), tf(-0.2, y + 0.14));
+        }
+        // 茎（中心へ）
+        seg(tf(0, 0), tf(0, 0.08));
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+      const mat = new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 1, toneMapped: false, depthWrite: false, blending: THREE.AdditiveBlending });
+      const lines = new THREE.LineSegments(geo, mat);
+      lines.userData.own = true;
+      this.disposables.push(geo, mat);
+      this.world.add(lines);
+      p.aoi = lines;
+    }
+    p.aoiT = 0.9;
+    p.aoi.visible = true;
   }
 
   showBarrier(p, color = null) {
@@ -3660,6 +3732,24 @@ export class Game {
     this.particles.update(dt);
     // player rig
     this.poseRig(p.rig, p, dt, this.animFor(p));
+    this.tickShieldFx(p, dt);
+    this.updateVisualsRest(p, dt);
+  }
+
+  // 吸収・防御エフェクトの更新（自分とオンラインの相手で共通）
+  tickShieldFx(p, dt) {
+    if (p.aoi) {
+      p.aoiT = (p.aoiT || 0) - dt;
+      const on = p.aoiT > 0;
+      p.aoi.visible = on;
+      if (on) {
+        const k = p.aoiT / 0.9;
+        p.aoi.position.set(p.x, p.y + p.h * 0.55, 0.9);
+        p.aoi.material.opacity = Math.min(1, k * 1.6);
+        p.aoi.scale.setScalar(0.8 + (1 - k) * 0.5);
+        p.aoi.rotation.z += dt * 1.5;
+      }
+    }
     if (p.barrier) {
       p.barrierT = (p.barrierT || 0) - dt;
       const on = p.barrierT > 0;
@@ -3673,6 +3763,9 @@ export class Game {
         p.barrier.rotation.x += dt * 2;
       }
     }
+  }
+
+  updateVisualsRest(p, dt) {
     for (const sh of this.shots) {
       if (sh.od && Math.random() < 0.5) {
         this.particles.emit(sh.x, sh.y, Math.random() < 0.5 ? 0xffcc33 : 0xffffff, 1, { speed: 1.5, life: 0.3, size: 0.45 });
@@ -3724,6 +3817,7 @@ export class Game {
         gh.x += (gh.tx - gh.x) * Math.min(1, dt * 12);
         gh.y += (gh.ty - gh.y) * Math.min(1, dt * 12);
         this.poseRig(gh.rig, gh, dt, gh.anim);
+        this.tickShieldFx(gh, dt);
         gh.rig.group.visible = gh.visible;
       }
     }
@@ -3840,9 +3934,40 @@ export class Game {
         return;
       }
       const opts = Number.isFinite(e.ang) && Math.abs(e.ang) < 100 ? { angle: e.ang } : {};
+      if (Number.isInteger(e.col) && e.col >= 0 && e.col <= 0xffffff) {
+        opts.color = e.col;
+      }
       const sh = this.spawnShot(n.hostile ? 'foe' : 'ally', e.type, e.x, e.y, e.dir, e.level, e.from, opts);
       if (sh && e.type === 'slash' && n.ghosts[e.from]) {
         sh.follow = n.ghosts[e.from];
+      }
+      if (sh && e.hom && e.type === 'wave') {
+        // 追尾斬撃（草薙の剣）：相手画面でも追尾させる
+        sh.beh = 'homing';
+        sh.life = 1.4;
+        sh.r = 0.55;
+        sh.faceVel = true;
+      }
+    }));
+    n.unsubs.push(room.on('fx', e => {
+      if (!this.running || !e || e.stage !== this.stage.id || n.only && e.from !== n.only) {
+        return;
+      }
+      const gh = n.ghosts[e.from];
+      if (!gh || !gh.visible) {
+        return;
+      }
+      const now = performance.now();
+      if (gh.fxT && now - gh.fxT < 150) {
+        return; // 連打対策
+      }
+      gh.fxT = now;
+      const col = Number.isInteger(e.color) && e.color >= 0 && e.color <= 0xffffff ? e.color : null;
+      if (e.kind === 'aoi') {
+        this.showAoi(gh);
+        this.particles.emit(gh.x, gh.y + 1, 0xffd166, 14, { ring: true, speed: 4, life: 0.35, size: 0.5 });
+      } else if (e.kind === 'barrier') {
+        this.showBarrier(gh, col);
       }
     }));
     n.hpOf = {};
@@ -3859,6 +3984,24 @@ export class Game {
         this.ui.banner('MISSION COMPLETE', 'clear', 3);
       }
     }));
+  }
+
+  // 麻呂ノ宮の出現テーマ：1ループ（約15秒）だけ流し、その後ステージ曲へ戻す
+  kugeEntrance() {
+    const now = performance.now();
+    if (this.kugeAt && now - this.kugeAt < 20000) {
+      return;
+    }
+    this.kugeAt = now;
+    setTrack('kuge');
+    playMusic(1);
+    const token = (this.kugeToken = (this.kugeToken || 0) + 1);
+    setTimeout(() => {
+      if (this.running && !this.ended && this.kugeToken === token && !this.bosses.some(b => !b.dead)) {
+        setTrack(this.stageTrack);
+        playMusic(1);
+      }
+    }, 15000);
   }
 
   setInvader(pid) {
@@ -3894,10 +4037,29 @@ export class Game {
     this.net = null;
   }
 
-  emitShot(type, x, y, dir, level, ang) {
+  // extra: { col: 弾の色, hom: 追尾 } — 相手画面でも同じ見た目・挙動で再現
+  emitShot(type, x, y, dir, level, ang, extra = null) {
     if (this.net && !this.net.quiet) {
-      this.net.room.emit('shot', { type, x, y, dir, level, stage: this.stage.id, ...(Number.isFinite(ang) ? { ang } : {}) });
+      const ex = {};
+      if (extra && Number.isInteger(extra.col)) ex.col = extra.col;
+      if (extra && extra.hom) ex.hom = 1;
+      this.net.room.emit('shot', { type, x, y, dir, level, stage: this.stage.id, ...(Number.isFinite(ang) ? { ang } : {}), ...ex });
     }
+  }
+
+  // 吸収・防御エフェクトを相手へ送る
+  emitFx(kind, color) {
+    if (this.net && !this.net.quiet) {
+      this.net.room.emit('fx', { kind, color: Number.isInteger(color) ? color : null, stage: this.stage.id });
+    }
+  }
+
+  removeGhost(n, pid) {
+    const gh = n.ghosts[pid];
+    if (!gh) return;
+    this.world.remove(gh.rig.group);
+    if (gh.aoi) this.world.remove(gh.aoi);
+    delete n.ghosts[pid];
   }
 
   onKO(e) {
@@ -4021,8 +4183,7 @@ export class Game {
       const look = `${pr.kit}|${pr.km || ''}|${pr.kf ? 1 : 0}|${pr.km && hasModel(pr.km) ? 1 : 0}`;
       if (gh && gh.look !== look) {
         // 古いプレゼンス（前回のキャラ）で作られたゴーストを作り直す
-        this.world.remove(gh.rig.group);
-        delete n.ghosts[pid];
+        this.removeGhost(n, pid);
         gh = null;
       }
       if (!gh) {
@@ -4033,6 +4194,9 @@ export class Game {
         }
         gh = { pid, look, kitId: pr.kit, kit, rig: this.makeRig(kit), x: pr.x, y: pr.y, tx: pr.x, ty: pr.y, w: kit.flail ? 1.1 : 0.8, h: kit.height || 1.7, dir: 1, anim: 'idle', visible: true };
         n.ghosts[pid] = gh;
+        if (gh.kitId === 'opkuge') {
+          this.kugeEntrance(); // 相手が麻呂ノ宮なら出現テーマ
+        }
       }
       gh.tx = num(pr.x, -5000, 5000, gh.tx);
       gh.ty = num(pr.y, -5000, 5000, gh.ty);
@@ -4043,8 +4207,7 @@ export class Game {
     }
     for (const pid in n.ghosts) {
       if (!seen.has(pid)) {
-        this.world.remove(n.ghosts[pid].rig.group);
-        delete n.ghosts[pid];
+        this.removeGhost(n, pid);
       }
     }
     // 侵入戦のHP共有：専用トピックで送信（変化時＋0.5秒ごと）し、相手のHPを専用パネルに表示

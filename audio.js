@@ -40,6 +40,7 @@ const TRACKS = {
   main: 'assets/audio/stage-theme.mp3',
   hero: 'assets/audio/hero-theme.mp3',
   boss: 'assets/audio/boss-theme-hq.mp3',
+  kuge: 'assets/audio/kuge-theme.mp3',
   hidden: 'assets/audio/bgm-hidden.mp3',
   finalboss: 'assets/audio/bgm-final-boss.mp3',
   lastboss: 'assets/audio/bgm-lastboss.mp3',

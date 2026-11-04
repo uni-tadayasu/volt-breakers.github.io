@@ -181,7 +181,13 @@ export class LocalRoom {
     }
     const x = b.x + b.dir * 0.6;
     const y = b.y + b.h * 0.55;
-    this.fire('shot', { type, x, y, dir: b.dir, level, stage: game.stage.id, from: b.id });
+    const ex = {};
+    if (type === 'buster' && b.kit.shotColor) ex.col = b.kit.shotColor[level] || b.kit.shotColor[0];
+    this.fire('shot', { type, x, y, dir: b.dir, level, stage: game.stage.id, from: b.id, ...ex });
+    if (type === 'slash' && b.kit.homingSlash) {
+      // 草薙の剣：COMも追尾斬撃を放つ
+      this.fire('shot', { type: 'wave', x, y, dir: b.dir, level: 0, stage: game.stage.id, from: b.id, col: 0x66ccff, hom: 1 });
+    }
     // COM同士の当たり判定用の簡易弾（見た目はゲーム側の弾）
     const slash = type === 'slash';
     this.shots.push({ x, y, vx: slash ? 0 : b.dir * 15, owner: b, dmg: level >= 2 ? 3 : level ? 2 : 1, life: slash ? 0.18 : 1.3, r: slash ? 1.2 : 0.4 });
