@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { WEAPONS, findKit } from './data.js';
 import { input } from './input.js';
-import { play, playMusic, setTrack } from './audio.js';
+import { play, playMusic, setTrack, lockTrack } from './audio.js';
 import { makeModel, playAnim, getTexture, ensureModel, hasModel } from './assets.js';
 
 const DEFERRED_MODELS = ['vb-hero-carmine2', 'vb-op-sage', 'vb-op-kuge', 'vb-operator-brute', 'vb-staff-hornet2', 'vb-staff-sage'];
@@ -504,6 +504,7 @@ export class Game {
     this.refreshHud();
     // オープニングステージとラスボス最終ステージは共通BGM（F-G-Am-A）
     this.stageTrack = st.id === 'intro' || st.id === 'f4' ? 'hero' : 'main';
+    lockTrack(null);
     setTrack(this.stageTrack);
     playMusic(1);
     // 麻呂ノ宮で出撃したら出現テーマ（開始処理の後に流して上書きされないようにする）
@@ -4004,15 +4005,21 @@ export class Game {
       return;
     }
     this.kugeAt = now;
-    setTrack('kuge');
+    // 出現中はずっと出現テーマ（ボス戦・撃破・復活でも切り替えない）
+    lockTrack('kuge');
     playMusic(1);
-    const token = (this.kugeToken = (this.kugeToken || 0) + 1);
-    setTimeout(() => {
-      if (this.running && !this.ended && this.kugeToken === token && !this.bosses.some(b => !b.dead)) {
-        setTrack(this.stageTrack);
-        playMusic(1);
-      }
-    }, 15000);
+  }
+
+  // 相手の麻呂ノ宮が去ったら固定を解除（自分が麻呂ノ宮なら維持）
+  checkKugeLeft() {
+    const me = this.player && this.player.kit;
+    if (me && (me.id === 'opkuge' || me.homingSlash)) return;
+    const ghosts = this.net ? Object.values(this.net.ghosts) : [];
+    if (ghosts.some(g => g.kitId === 'opkuge' || g.kit.model === 'vb-op-kuge')) return;
+    lockTrack(null);
+    this.kugeAt = 0;
+    setTrack(this.bosses.some(b => !b.dead) ? 'boss' : this.stageTrack);
+    playMusic(1);
   }
 
   setInvader(pid) {
@@ -4071,6 +4078,7 @@ export class Game {
     this.world.remove(gh.rig.group);
     if (gh.aoi) this.world.remove(gh.aoi);
     delete n.ghosts[pid];
+    if (gh.kitId === 'opkuge' || gh.kit.model === 'vb-op-kuge') this.checkKugeLeft();
   }
 
   onKO(e) {

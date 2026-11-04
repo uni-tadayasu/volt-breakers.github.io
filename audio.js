@@ -48,7 +48,15 @@ const TRACKS = {
 };
 let currentTrack = 'main';
 
+// 曲の固定（麻呂ノ宮の出現中は他の曲に切り替えない）
+let lockedTrack = null;
+export function lockTrack(name) {
+  lockedTrack = name && TRACKS[name] ? name : null;
+  if (lockedTrack) setTrack(lockedTrack);
+}
+
 export function setTrack(name) {
+  if (lockedTrack) name = lockedTrack;
   const key = TRACKS[name] ? name : 'main';
   if (key === currentTrack) {
     // 同じ曲でも止まっていたら先頭から再開できるようにする
