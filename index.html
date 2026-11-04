@@ -302,6 +302,18 @@
       #t-wpn { right:calc(env(safe-area-inset-right) + 120px); bottom:calc(env(safe-area-inset-bottom) + 104px); width:52px; height:52px; font-size:11px; }
       #t-sp { right:calc(env(safe-area-inset-right) + 182px); bottom:calc(env(safe-area-inset-bottom) + 70px); width:56px; height:56px; font-size:13px; border-color:rgba(255,200,90,.85); }
       #t-tank { left:calc(env(safe-area-inset-left) + 54px); bottom:calc(env(safe-area-inset-bottom) + 104px); width:48px; height:48px; font-size:11px; }
+      /* 端末幅に合わせて文字・ボタン・カードを連続的に拡縮（PC〜スマホ） */
+      .screen h2 { font-size:clamp(20px,4.2vw,34px); }
+      .screen .sub { font-size:clamp(12px,2.6vw,16px); line-height:1.5; overflow-wrap:anywhere; }
+      .screen .btn { font-size:clamp(14px,2.8vw,18px); padding:clamp(6px,1.4vw,10px) clamp(12px,2.6vw,20px); }
+      .screen input[type=text] { max-width:min(240px,70vw); font-size:clamp(13px,3vw,15px) !important; }
+      .screen .row { flex-wrap:wrap; justify-content:center; gap:6px; }
+      .cards .card { width:clamp(130px,28vw,220px); }
+      .cards .card img { width:100%; height:auto; aspect-ratio:3/4; object-fit:contain; }
+      .card.locked { opacity:.85; outline:2px dashed #c04a4a; }
+      .panel.col { max-width:min(560px,94vw); box-sizing:border-box; }
+      @media (max-width:420px) { .cards { gap:8px; } .cards .card { width:44vw; padding:6px; } }
+      @media (hover:none) { .screen .btn { min-height:40px; } }
     </style>
   
 <style>
@@ -399,7 +411,7 @@
           <li>炎の狐、氷晶の巻貝、風の蛾、雷のムカデなど個性豊かな8体の守護機。ステージごとに床と壁の色が変わる</li>
           <li>オープニングでは、赤いV字バイザーの槍使い「ゲイル・ランサー」が待ち受ける</li>
           <li>弾丸型のバスター、ミサイル、炎、電撃球など、形のある攻撃エフェクト</li>
-          <li>追加キャラ「カーマイン」（買い切り）：赤い光線弾のチャージショットと、遠距離攻撃を防ぐ盾</li>
+          <li>追加キャラ「カーマイン」（買い切り）：赤い光線弾のチャージショットと、構えて遠距離攻撃を防ぐ六角盾の騎士</li>
           <li>同期コードで、PC・スマホ・タブレット間で進行状況を共有</li>
           <li>パスワードで続きから遊べる</li>
           <li>オフライン対戦（自分＋COM最大3体、全キャラクター使用可能）</li>

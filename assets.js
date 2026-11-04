@@ -5,7 +5,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 // 起動時に必須のモデルのみ先に読み込み、終盤・特殊キャラ用は後から裏で読み込む（初回表示を高速化）
 const MODELS = ['vb-hero-van', 'vb-hero-rei', 'enemy-walker'];
-const DEFERRED = ['vb-hero-carmine', 'vb-operator-brute', 'vb-staff-hornet2', 'vb-staff-sage'];
+const DEFERRED = ['vb-hero-carmine2', 'vb-op-sage', 'vb-operator-brute', 'vb-staff-hornet2', 'vb-staff-sage'];
 const pendingModels = {};
 const TEXTURES = ['vb-tile-floor', 'vb-tile-wall', 'vb-bossroom-wall', 'vb-bg-city', 'vb-bg-fortress', 'vb-i-hs', 'vb-i-hl', 'vb-i-en', 'vb-i-up', 'vb-i-tank'];
 
@@ -145,6 +145,7 @@ const ANIM_PREF = {
   idle: ['idle', 'sword_idle'],
   sword: ['sword_attack', 'sword_regular_a', 'sword'],
   shoot: ['pistol_shoot', 'spell_simple_shoot', 'shoot'],
+  guard: ['sword_block', 'idle_shield_loop', 'shield_oneshot', 'idle'],
 };
 
 export function playAnim(rig, keyword) {

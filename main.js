@@ -5,7 +5,7 @@ import {
   heroKit, versusRoster, findKit, OVERLORD_KIT, STAFF_KITS, OPERATOR_WEAPONS, encodePassword, decodePassword,
 } from './data.js';
 import { isOperatorKey, isStaffKey, issueStaffKey, normKey, isPremiumCode, issuePremiumCode, PREMIUM_URL, newSyncCode, isSyncCode } from './keys.js';
-import { PREMIUM_HERO } from './data.js';
+import { PREMIUM_HERO, OPERATOR_SAGE_KIT } from './data.js';
 import { pushSync, pullSync } from './net.js';
 import { input } from './input.js';
 import { unlock, play, setVolumes, playMusic, stopMusic } from './audio.js';
@@ -732,7 +732,8 @@ function lobby(code, creator = false) {
 const offline = { kit: null, coms: 1, diff: 'normal', comKits: [] };
 const OFF_DIFF = { easy: 'かんたん', normal: 'ふつう', hard: 'つよい' };
 function offlineRoster() {
-  return [...versusRoster(true, hasPremium()), ...STAFF_KITS];
+  // operatorOnly のキャラは運営キー登録者のみ
+  return [...versusRoster(true, hasPremium()).filter(k => !k.operatorOnly || save.operator), ...STAFF_KITS];
 }
 function rollComs() {
   // 自分と被らないキャラをランダムに選ぶ（COM同士も重複なし）
@@ -812,7 +813,7 @@ function startOffline() {
 const ALL_STAGES = [INTRO_STAGE, ...STAGES, ...FINAL_STAGES];
 let invaderKit = null;
 function invaderChoices() {
-  return [...(save.operator ? [{ ...OVERLORD_KIT, weapons: OPERATOR_WEAPONS }] : []), ...STAFF_KITS];
+  return [...(save.operator ? [{ ...OVERLORD_KIT, weapons: OPERATOR_WEAPONS }, OPERATOR_SAGE_KIT] : []), ...STAFF_KITS];
 }
 function invadePick() {
   if (!canInvade()) {

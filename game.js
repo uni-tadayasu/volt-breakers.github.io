@@ -6,7 +6,7 @@ import { input } from './input.js';
 import { play, playMusic, setTrack } from './audio.js';
 import { makeModel, playAnim, getTexture, ensureModel, hasModel } from './assets.js';
 
-const DEFERRED_MODELS = ['vb-hero-carmine', 'vb-operator-brute', 'vb-staff-hornet2', 'vb-staff-sage'];
+const DEFERRED_MODELS = ['vb-hero-carmine2', 'vb-op-sage', 'vb-operator-brute', 'vb-staff-hornet2', 'vb-staff-sage'];
 // ネットワークから受け付ける弾種／モデル名のホワイトリスト
 export const SHOT_TYPES = new Set(['buster', 'slash', 'wave', 'fire', 'ice', 'homing', 'spark', 'quake', 'boomerang', 'laser', 'spread', 'spikebomb', 'cutter', 'mine', 'ray']);
 const BOSS_MODELS = [
@@ -14,11 +14,12 @@ const BOSS_MODELS = [
   'vb-op-boss', 'vb-hid-shadow', 'vb-hid-void', 'vb-hid-crimson', 'vb-fused', 'vb-guardian', 'vb-overlord', 'vb-overlord2',
 ];
 const NET_MODELS = new Set(['vb-hero-van', 'vb-hero-rei', 'enemy-walker', 'boss-mech', ...DEFERRED_MODELS, ...BOSS_MODELS]);
+const NET_ANIMS = new Set(['idle', 'run', 'jump', 'sword', 'shoot', 'spin', 'guard']);
 const num = (v, lo, hi, d) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
 import { myId } from './net.js';
 
 // オンライン同期の版番号（見た目・技の仕様を変えたら上げる）
-export const NET_VER = 21;
+export const NET_VER = 22;
 // アリーナの初期位置：人数に応じて均等に配置（障害物の柱 ±15.6〜17 を避けた座標）
 const ARENA_SLOTS = { 1: [0], 2: [-12, 12], 3: [-18, 0, 18], 4: [-18, -6, 6, 18] };
 export function arenaSpawnX(i, n) {
@@ -1309,7 +1310,9 @@ export class Game {
     p.comboT -= dt;
     p.slashT -= dt;
     p.shootAnim -= dt;
+    p.guardT = (p.guardT || 0) - dt;
     this.updateSpinRay(p, dt);
+    this.updateTriShot(p, dt);
     if (input.isDown('shoot')) {
       p.charge += dt;
       const lv = p.charge > 1.4 ? 2 : p.charge > 0.6 ? 1 : 0;
@@ -1364,6 +1367,12 @@ export class Game {
       play('zap');
       return;
     }
+    if (p.kit.triShot && type === 'buster') {
+      p.triQ = 3;
+      p.triT = 0;
+      p.triLv = level;
+      return;
+    }
     p.shootT = 0.14;
     p.shootAnim = 0.3;
     const x = p.x + p.dir * 0.7;
@@ -1381,6 +1390,33 @@ export class Game {
     this.muzzleFx(type, x, y, p.dir, level);
     this.emitShot(type, x, y, p.dir, level);
     play(type === 'buster' ? 'shot' : 'zap');
+  }
+
+  // 緑の三連光線：上斜め → 下斜め → 正面 の順に 0.09 秒間隔で発射
+  updateTriShot(p, dt) {
+    if (!(p.triQ > 0)) {
+      return;
+    }
+    p.triT -= dt;
+    if (p.triT > 0) {
+      return;
+    }
+    p.triT = 0.09;
+    const k = 3 - p.triQ;
+    p.triQ--;
+    const tilt = [0.35, -0.35, 0][k];
+    const a = p.dir > 0 ? tilt : Math.PI - tilt;
+    const x = p.x + p.dir * 0.7;
+    const y = p.y + p.h * 0.6;
+    const lvl = p.triLv || 0;
+    const sh = this.spawnShot('ally', 'ray', x, y, p.dir, 0, myId, { angle: a, color: 0x33ff77 });
+    sh.dmg = lvl === 2 ? 3 : lvl === 1 ? 2 : 1.5;
+    if (lvl) sh.pierce = true;
+    this.emitShot('ray', x, y, p.dir, 0, a);
+    this.muzzleFx('buster', x, y, p.dir, 0);
+    p.shootT = 0.14;
+    p.shootAnim = 0.3;
+    play('zap');
   }
 
   updateSpinRay(p, dt) {
@@ -1433,6 +1469,17 @@ export class Game {
     if (p.dead || p.inv > 0 || this.readyT > 0 || this.clearT >= 0) {
       return;
     }
+    // 吸収バリア（運営専用キャラ）：攻撃していない時の被弾をバリアで受け、その分回復
+    if (p.kit.absorb && !(p.shootT > 0) && !(p.triQ > 0)) {
+      const heal = Math.round(dmg);
+      p.hp = Math.min(p.max, p.hp + heal);
+      p.inv = 0.6;
+      this.showBarrier(p, 0x33ff77);
+      this.particles.emit(p.x, p.y + 1, 0x66ff99, 14, { ring: true, speed: 4, life: 0.35, size: 0.5 });
+      play('select');
+      this.refreshHud();
+      return;
+    }
     if (this.parts & 8) {
       dmg = Math.max(1, Math.ceil(dmg * 0.5));
       this.showBarrier(p);
@@ -1451,7 +1498,7 @@ export class Game {
     }
   }
 
-  showBarrier(p) {
+  showBarrier(p, color = null) {
     if (!p.barrier) {
       const m = new THREE.Mesh(
         new THREE.IcosahedronGeometry(1.15, 2),
@@ -1470,7 +1517,10 @@ export class Game {
     }
     p.barrierT = 0.7;
     p.barrier.position.set(0, p.h * 0.55, 0);
-    this.particles.emit(p.x, p.y + p.h * 0.55, 0xc77dff, 16, { ring: true, speed: 4, life: 0.4, size: 0.6 });
+    const bc = color || 0xc77dff;
+    p.barrier.material.color.setHex(bc);
+    p.barrier.children[0]?.material.color.setHex(color || 0x9a6bff);
+    this.particles.emit(p.x, p.y + p.h * 0.55, bc, 16, { ring: true, speed: 4, life: 0.4, size: 0.6 });
     play('deflect');
   }
 
@@ -2331,6 +2381,7 @@ export class Game {
         if (p.kit.shield && !(p.shootT > 0) && sh.beh !== 'quake' && Math.sign(sh.x - p.x || p.dir) === p.dir) {
           this.particles.emit(sh.x, sh.y, 0xffffff, 8, { ring: true, speed: 4, life: 0.2, size: 0.4 });
           play('select');
+          p.guardT = 0.45;
           gone = true;
         } else if (p.inv <= 0) {
           this.hurtPlayer(sh.dmg, sh.owner);
@@ -3692,6 +3743,10 @@ export class Game {
     if (p.shootAnim > 0) {
       return 'shoot';
     }
+    // 盾持ち：防御直後は盾を構える
+    if (p.guardT > 0) {
+      return 'guard';
+    }
     if (Math.abs(p.vx) > 0.2) {
       return 'run';
     }
@@ -3983,7 +4038,7 @@ export class Game {
       gh.ty = num(pr.y, -5000, 5000, gh.ty);
       gh.name = String(pr.name || gh.kit.name || '').slice(0, 24);
       gh.dir = pr.dir;
-      gh.anim = pr.anim || 'idle';
+      gh.anim = NET_ANIMS.has(pr.anim) ? pr.anim : 'idle';
       gh.visible = !pr.dead;
     }
     for (const pid in n.ghosts) {

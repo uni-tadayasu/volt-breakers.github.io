@@ -155,9 +155,15 @@ export const STAFF_KITS = [
 ];
 // 有料キャラ（購入コード／運営・スタッフキーで解放）：赤い光線弾＋正面の遠距離弾を防ぐ盾
 export const PREMIUM_HERO = {
-  id: 'carmine', name: 'カーマイン', model: 'vb-hero-carmine', height: 1.75, weapon: 'buster', color: 0xff3344, hp: 28,
-  portrait: 'assets/vb-p-carmine.webp', desc: '赤い光線弾と盾。撃っていない間は正面の弾を防ぐ',
+  id: 'carmine', name: 'カーマイン', model: 'vb-hero-carmine2', height: 1.75, weapon: 'buster', color: 0xff3344, hp: 28,
+  portrait: 'assets/vb-p-carmine2.webp', desc: '赤い光線弾と六角盾の騎士。撃っていない間は盾を構え正面の弾を防ぐ',
   shield: true, shotColor: [0xff4a4a, 0xff2a5a, 0xff1030], premium: true,
+};
+// 運営専用キャラ2：老賢機「ヴェルド博士」— 緑の三連光線（上斜め→下斜め→正面）＋吸収バリア
+export const OPERATOR_SAGE_KIT = {
+  id: 'opsage', name: 'ヴェルド博士', model: 'vb-op-sage', height: 1.95, weapon: 'buster', color: 0x33ff77, hp: 40,
+  portrait: 'assets/vb-p-opsage.webp', desc: '緑の三連光線。攻撃していない時の被弾をバリアで吸収し回復（運営専用）',
+  triShot: true, absorb: true, operatorOnly: true,
 };
 export const OPERATOR_WEAPONS = ['spikebomb', 'boomerang', 'quake', 'spark', 'fire'];
 
@@ -170,7 +176,7 @@ export function versusRoster(isOperator, hasPremium = isOperator) {
     bossKit(INTRO_BOSS), bossKit(GUARDIAN), bossKit(FUSED),
   ];
   if (isOperator) {
-    list.push(OVERLORD_KIT);
+    list.push(OVERLORD_KIT, OPERATOR_SAGE_KIT);
   }
   return list;
 }
