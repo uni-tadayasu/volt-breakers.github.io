@@ -153,11 +153,18 @@ export const STAFF_KITS = [
     weapons: ['spark', 'mine', 'spinray', 'laser'],
   },
 ];
+// 有料キャラ（購入コード／運営・スタッフキーで解放）：赤い光線弾＋正面の遠距離弾を防ぐ盾
+export const PREMIUM_HERO = {
+  id: 'carmine', name: 'カーマイン', model: 'vb-hero-carmine', height: 1.75, weapon: 'buster', color: 0xff3344, hp: 28,
+  portrait: 'assets/vb-p-carmine.webp', desc: '赤い光線弾と盾。撃っていない間は正面の弾を防ぐ',
+  shield: true, shotColor: [0xff4a4a, 0xff2a5a, 0xff1030], premium: true,
+};
 export const OPERATOR_WEAPONS = ['spikebomb', 'boomerang', 'quake', 'spark', 'fire'];
 
-export function versusRoster(isOperator) {
+export function versusRoster(isOperator, hasPremium = isOperator) {
   const list = [
     ...HEROES.map(heroKit),
+    ...(hasPremium ? [heroKit(PREMIUM_HERO)] : []),
     ...BOSSES.map((b, i) => bossKit(bossDef(b, i))),
     ...HIDDEN.map(h => bossKit(hiddenDef(h))),
     bossKit(INTRO_BOSS), bossKit(GUARDIAN), bossKit(FUSED),
@@ -169,7 +176,7 @@ export function versusRoster(isOperator) {
 }
 
 export function findKit(id) {
-  return versusRoster(true).find(k => k.id === id) || STAFF_KITS.find(k => k.id === id) || HEROES[0];
+  return versusRoster(true, true).find(k => k.id === id) || STAFF_KITS.find(k => k.id === id) || HEROES[0];
 }
 
 // ---- Password codec (5 chars) ----

@@ -4,7 +4,9 @@ import {
   WEAPONS, HEROES, BOSSES, STAGES, INTRO_STAGE, FINAL_STAGES, ARENA_STAGE,
   heroKit, versusRoster, findKit, OVERLORD_KIT, STAFF_KITS, OPERATOR_WEAPONS, encodePassword, decodePassword,
 } from './data.js';
-import { isOperatorKey, isStaffKey, issueStaffKey, normKey } from './keys.js';
+import { isOperatorKey, isStaffKey, issueStaffKey, normKey, isPremiumCode, issuePremiumCode, PREMIUM_URL, newSyncCode, isSyncCode } from './keys.js';
+import { PREMIUM_HERO } from './data.js';
+import { pushSync, pullSync } from './net.js';
 import { input } from './input.js';
 import { unlock, play, setVolumes, playMusic, stopMusic } from './audio.js';
 import { loadAll, loadDeferred } from './assets.js';
@@ -18,33 +20,42 @@ const esc = v => String(v).slice(0, 40).replace(/[&<>"'`]/g, c => `&#${c.charCod
 const BG = img => `background-image:linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.7)),url('${img}')`;
 
 // ---------- save ----------
-const DEFAULTS = { hero: 0, cleared: 0, hidden: 0, etanks: 0, intro: false, bgm: 0.55, sfx: 0.8, touch: 'auto', operator: false, staffKey: '' };
+const DEFAULTS = { hero: 0, cleared: 0, hidden: 0, etanks: 0, intro: false, bgm: 0.55, sfx: 0.8, touch: 'auto', operator: false, staffKey: '', premiumCode: '', syncCode: '' };
 // スタッフ権限は保存されたキー文字列を毎回検証（フラグ書き換えだけでは有効にならない）
 const isStaff = () => isStaffKey(save.staffKey);
 const canInvade = () => save.operator || isStaff();
-let save;
-try {
-  const raw = JSON.parse(localStorage.getItem('nih-save') || '{}');
-  save = { ...DEFAULTS };
-  // 改ざん・破損対策：既知キーのみ、型と範囲を検証して取り込む（プロトタイプ汚染も防止）
-  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-    const int = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : undefined);
-    const vol = v => (typeof v === 'number' && v >= 0 && v <= 1 ? v : undefined);
-    const chk = {
-      hero: v => int(v, 0, 1), cleared: v => int(v, 0, 255), hidden: v => int(v, 0, 7), etanks: v => int(v, 0, 9), parts: v => int(v, 0, 15),
-      intro: v => (typeof v === 'boolean' ? v : undefined), bgm: vol, sfx: vol,
-      touch: v => (['auto', 'on', 'off'].includes(v) ? v : undefined), operator: v => (typeof v === 'boolean' ? v : undefined),
-      staffKey: v => (typeof v === 'string' && isStaffKey(v) ? normKey(v) : undefined),
-    };
-    for (const k of Object.keys(chk)) {
-      if (Object.prototype.hasOwnProperty.call(raw, k)) {
-        const v = chk[k](raw[k]);
-        if (v !== undefined) {
-          save[k] = v;
-        }
+// 有料キャラ：購入コード、または運営／スタッフキー登録済みなら使用可
+const hasPremium = () => save.operator || isStaff() || isPremiumCode(save.premiumCode);
+// 改ざん・破損対策：既知キーのみ、型と範囲を検証して取り込む（プロトタイプ汚染も防止）
+// localStorage と端末間同期の両方で同じ検証を通す
+function sanitizeSave(raw, base = DEFAULTS) {
+  const out = { ...base };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return out;
+  }
+  const int = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : undefined);
+  const vol = v => (typeof v === 'number' && v >= 0 && v <= 1 ? v : undefined);
+  const chk = {
+    hero: v => int(v, 0, 2), cleared: v => int(v, 0, 255), hidden: v => int(v, 0, 7), etanks: v => int(v, 0, 9), parts: v => int(v, 0, 15),
+    intro: v => (typeof v === 'boolean' ? v : undefined), bgm: vol, sfx: vol,
+    touch: v => (['auto', 'on', 'off'].includes(v) ? v : undefined), operator: v => (typeof v === 'boolean' ? v : undefined),
+    staffKey: v => (typeof v === 'string' && isStaffKey(v) ? normKey(v) : undefined),
+    premiumCode: v => (typeof v === 'string' && isPremiumCode(v) ? normKey(v) : undefined),
+    syncCode: v => (typeof v === 'string' && isSyncCode(v) ? normKey(v) : undefined),
+  };
+  for (const k of Object.keys(chk)) {
+    if (Object.prototype.hasOwnProperty.call(raw, k)) {
+      const v = chk[k](raw[k]);
+      if (v !== undefined) {
+        out[k] = v;
       }
     }
   }
+  return out;
+}
+let save;
+try {
+  save = sanitizeSave(JSON.parse(localStorage.getItem('nih-save') || '{}'));
 } catch (e) {
   save = { ...DEFAULTS };
 }
@@ -94,6 +105,9 @@ function getHub() {
 }
 
 function hero() {
+  if (save.hero === 2) {
+    return hasPremium() ? PREMIUM_HERO : HEROES[0];
+  }
   return HEROES[save.hero] || HEROES[0];
 }
 function ownedWeapons(all = false) {
@@ -192,10 +206,46 @@ function charSelect(done, back) {
   show(`<h2>キャラクターセレクト</h2>
     <div class="cards">
       ${HEROES.map((h, i) => `<div class="panel card" data-act="${i}"><img src="${h.portrait}" alt=""><h2 style="font-size:22px;margin-top:6px">${h.name}</h2><div class="sub">${h.desc}</div></div>`).join('')}
+      <div class="panel card ${hasPremium() ? '' : 'locked'}" data-act="${hasPremium() ? 2 : 'buy'}"><img src="${PREMIUM_HERO.portrait}" alt="" style="${hasPremium() ? '' : 'filter:grayscale(.8) brightness(.6)'}"><h2 style="font-size:22px;margin-top:6px">${PREMIUM_HERO.name}${hasPremium() ? '' : ' 🔒'}</h2><div class="sub">${hasPremium() ? PREMIUM_HERO.desc : '有料キャラ（買い切り）。タップで購入／コード入力'}</div></div>
     </div>${btn('back', '戻る')}`, {
     back,
-    on: act => (act === 'back' ? back() : done(+act)),
+    on: act => (act === 'back' ? back() : act === 'buy' ? premiumScreen(() => charSelect(done, back)) : done(+act)),
   });
+}
+
+// 有料キャラ購入・解放画面
+function premiumScreen(back) {
+  const root = show(`<h2>${PREMIUM_HERO.name} を解放</h2><div class="panel col">
+    <img src="${PREMIUM_HERO.portrait}" alt="${PREMIUM_HERO.name}" style="width:140px;margin:0 auto" loading="lazy">
+    <div class="sub">赤い光線弾（チャージ可）と、正面の遠距離攻撃を防ぐ盾を持つ戦士。<br>ソロ・オフライン・オンラインで使用できます（1回限りの購入）。</div>
+    ${btn('buy', '購入ページへ（Stripe）')}
+    <div class="sub">購入後に届く購入コードを入力してください</div>
+    <div class="row"><input type="text" id="pc" maxlength="32" autocomplete="off" spellcheck="false" placeholder="VBP-XXXXXX-XXXX" style="font-size:14px;letter-spacing:1px;width:200px">${btn('code', '解放', 'style="min-width:0"')}</div>
+    <div class="sub" id="pcmsg"></div>
+    ${btn('back', '戻る')}</div>`, {
+    back,
+    on: act => {
+      if (act === 'back') {
+        back();
+      } else if (act === 'buy') {
+        // 決済は外部の Stripe ページで行う（カード情報はこのサイトに一切渡らない）
+        window.open(PREMIUM_URL, '_blank', 'noopener,noreferrer');
+      } else if (act === 'code') {
+        const v = normKey($('#pc').value);
+        if (isPremiumCode(v)) {
+          save.premiumCode = v;
+          persist();
+          play('select');
+          ui.toast(`${PREMIUM_HERO.name} を解放しました！`, 2);
+          back();
+        } else {
+          play('buzz');
+          $('#pcmsg').textContent = '購入コードが違います';
+        }
+      }
+    },
+  });
+  root.querySelector('#pc')?.focus();
 }
 
 function opening() {
@@ -410,6 +460,14 @@ function options() {
     <div class="sub" id="o-msg">${save.operator ? '運営モード：有効' : isStaff() ? 'スタッフモード：有効' : ''}</div>
     ${save.operator ? `<div class="row">${btn('issue', 'スタッフキー発行', 'style="min-width:0"')}<input type="text" id="o-issued" readonly style="font-size:14px;letter-spacing:1px;width:180px"></div>` : ''}
     ${isStaff() ? btn('unstaff', 'スタッフ登録を解除') : ''}
+    ${save.operator ? `<div class="row">${btn('issuep', '購入コード発行', 'style="min-width:0"')}<input type="text" id="o-pissued" readonly style="font-size:14px;letter-spacing:1px;width:180px"></div>` : ''}
+    <div class="sub">${PREMIUM_HERO.name}：${hasPremium() ? '解放済み' : '未購入'}</div>
+    ${hasPremium() ? '' : btn('premium', `${PREMIUM_HERO.name} を購入／コード入力`)}
+    <h3 style="margin:8px 0 0">端末間同期</h3>
+    <div class="sub">同期コードを他の端末に入力すると、進行・購入・キーを共有できます。コードは他人に教えないでください。</div>
+    <div class="row"><input type="text" id="o-sync" maxlength="19" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" value="${save.syncCode}" style="font-size:14px;letter-spacing:1px;width:210px"></div>
+    <div class="row">${btn('sup', 'この端末を保存', 'style="min-width:0"')}${btn('sdown', 'コードから読込', 'style="min-width:0"')}</div>
+    <div class="sub" id="o-smsg"></div>
     ${btn('back', '戻る')}</div>`, {
     back: menu,
     on: act => {
@@ -438,6 +496,45 @@ function options() {
         save.staffKey = '';
         persist();
         options();
+      } else if (act === 'issuep') {
+        const out = $('#o-pissued');
+        out.value = issuePremiumCode();
+        out.select();
+        navigator.clipboard?.writeText(out.value).then(() => ui.toast('コピーしました', 1.5), () => {});
+      } else if (act === 'premium') {
+        premiumScreen(options);
+      } else if (act === 'sup') {
+        const msg = $('#o-smsg');
+        let code = normKey($('#o-sync').value);
+        if (!isSyncCode(code)) code = newSyncCode();
+        msg.textContent = '保存中…';
+        pushSync(code, save).then(() => {
+          save.syncCode = code;
+          persist();
+          $('#o-sync').value = code;
+          msg.textContent = '保存しました。他の端末でこのコードを入力してください';
+          navigator.clipboard?.writeText(code).catch(() => {});
+        }, () => { msg.textContent = '保存に失敗しました（通信を確認）'; });
+      } else if (act === 'sdown') {
+        const msg = $('#o-smsg');
+        const code = normKey($('#o-sync').value);
+        if (!isSyncCode(code)) {
+          msg.textContent = '同期コードの形式が違います';
+          return;
+        }
+        msg.textContent = '読込中…';
+        pullSync(code).then(data => {
+          if (!data) {
+            msg.textContent = 'データが見つかりません';
+            return;
+          }
+          // 音量・タッチ設定は端末ごとに保持し、進行と権限のみ取り込む（必ず検証を通す）
+          const keep = { bgm: save.bgm, sfx: save.sfx, touch: save.touch };
+          save = { ...sanitizeSave(data), ...keep, syncCode: code };
+          persist();
+          ui.toast('同期しました', 1.5);
+          options();
+        }, () => { msg.textContent = '読込に失敗しました（通信を確認）'; });
       } else if (act === 'issue') {
         const out = $('#o-issued');
         out.value = issueStaffKey();
@@ -566,7 +663,9 @@ function lobby(code, creator = false) {
       return;
     }
     const s = state();
-    const roster = s.mode === 'coop' ? HEROES.map(heroKit) : versusRoster(save.operator);
+    const roster = s.mode === 'coop'
+      ? [...HEROES.map(heroKit), ...(hasPremium() ? [heroKit(PREMIUM_HERO)] : [])]
+      : versusRoster(save.operator, hasPremium());
     if (me.mode !== s.mode && !s.host) {
       me.mode = s.mode;
     }
@@ -633,7 +732,7 @@ function lobby(code, creator = false) {
 const offline = { kit: null, coms: 1, diff: 'normal', comKits: [] };
 const OFF_DIFF = { easy: 'かんたん', normal: 'ふつう', hard: 'つよい' };
 function offlineRoster() {
-  return [...versusRoster(true), ...STAFF_KITS];
+  return [...versusRoster(true, hasPremium()), ...STAFF_KITS];
 }
 function rollComs() {
   // 自分と被らないキャラをランダムに選ぶ（COM同士も重複なし）

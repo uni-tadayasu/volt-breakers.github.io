@@ -6,7 +6,7 @@ import { input } from './input.js';
 import { play, playMusic, setTrack } from './audio.js';
 import { makeModel, playAnim, getTexture, ensureModel, hasModel } from './assets.js';
 
-const DEFERRED_MODELS = ['vb-operator-brute', 'vb-staff-hornet2', 'vb-staff-sage'];
+const DEFERRED_MODELS = ['vb-hero-carmine', 'vb-operator-brute', 'vb-staff-hornet2', 'vb-staff-sage'];
 // ネットワークから受け付ける弾種／モデル名のホワイトリスト
 export const SHOT_TYPES = new Set(['buster', 'slash', 'wave', 'fire', 'ice', 'homing', 'spark', 'quake', 'boomerang', 'laser', 'spread', 'spikebomb', 'cutter', 'mine', 'ray']);
 const BOSS_MODELS = [
@@ -1377,7 +1377,7 @@ export class Game {
       }
       this.shake(0.1);
     }
-    this.spawnShot('ally', type, x, y, p.dir, level, myId);
+    this.spawnShot('ally', type, x, y, p.dir, level, myId, p.kit.shotColor && type === 'buster' ? { color: p.kit.shotColor[level] || p.kit.shotColor[0] } : {});
     this.muzzleFx(type, x, y, p.dir, level);
     this.emitShot(type, x, y, p.dir, level);
     play(type === 'buster' ? 'shot' : 'zap');
@@ -2327,7 +2327,12 @@ export class Game {
           }
         }
       } else if (!p.dead && this.hitTest(sh, p)) {
-        if (p.inv <= 0) {
+        // 盾持ちキャラ：撃っていない間は正面からの遠距離弾を防ぐ（地震柱は防げない）
+        if (p.kit.shield && !(p.shootT > 0) && sh.beh !== 'quake' && Math.sign(sh.x - p.x || p.dir) === p.dir) {
+          this.particles.emit(sh.x, sh.y, 0xffffff, 8, { ring: true, speed: 4, life: 0.2, size: 0.4 });
+          play('select');
+          gone = true;
+        } else if (p.inv <= 0) {
           this.hurtPlayer(sh.dmg, sh.owner);
         }
         if (!sh.pierce) {

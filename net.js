@@ -32,6 +32,32 @@ export function preloadNet() {
   }
 }
 
+// ---- 端末間セーブ同期（同期コードで保存・取得） ----
+// 中身は呼び出し側で必ず検証してから使う（sanitizeSave）。サイズ上限で悪用を防止
+const SYNC_MAX = 4000;
+async function findSync(db, code) {
+  const r = await db.queryOnce({ vbsync: { $: { where: { code } } } });
+  return r?.data?.vbsync?.[0] || null;
+}
+export async function pushSync(code, data) {
+  const json = JSON.stringify(data);
+  if (json.length > SYNC_MAX) throw new Error('too large');
+  const db = await getDb();
+  const cur = await findSync(db, code);
+  const id = cur?.id || uuid();
+  await db.transact(db.tx.vbsync[id].update({ code, json, t: Date.now() }));
+}
+export async function pullSync(code) {
+  const db = await getDb();
+  const cur = await findSync(db, code);
+  if (!cur || typeof cur.json !== 'string' || cur.json.length > SYNC_MAX) return null;
+  try {
+    return JSON.parse(cur.json);
+  } catch (e) {
+    return null;
+  }
+}
+
 export const myId = uuid();
 export const newId = () => uuid();
 
