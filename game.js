@@ -510,6 +510,11 @@ export class Game {
     this.kugeAt = 0;
     this.kugeToken = (this.kugeToken || 0) + 1;
     const isKuge = k => !!k && (k.id === 'opkuge' || k.model === 'vb-op-kuge' || k.homingSlash);
+    this.battleMode = this.mode === 'versus' || !!st.arena;
+    if (this.battleMode && (isKuge(cfg.kit) || isKuge(this.player && this.player.kit))) {
+      // 対戦（オフライン／オンライン）では撃破・復活をまたいで出現テーマを流し続ける
+      this.stageTrack = 'kuge';
+    }
     if (isKuge(cfg.kit) || isKuge(this.player && this.player.kit)) {
       setTimeout(() => {
         if (this.running && !this.ended) this.kugeEntrance();
@@ -4201,6 +4206,7 @@ export class Game {
         gh = { pid, look, kitId: pr.kit, kit, rig: this.makeRig(kit), x: pr.x, y: pr.y, tx: pr.x, ty: pr.y, w: kit.flail ? 1.1 : 0.8, h: kit.height || 1.7, dir: 1, anim: 'idle', visible: true };
         n.ghosts[pid] = gh;
         if (gh.kitId === 'opkuge' || kit.model === 'vb-op-kuge') {
+          if (this.battleMode) this.stageTrack = 'kuge'; // 対戦中は流し続ける
           this.kugeEntrance(); // 相手が麻呂ノ宮なら出現テーマ
         }
       }
